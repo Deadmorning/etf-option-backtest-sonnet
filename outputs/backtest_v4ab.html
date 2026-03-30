@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>v4 三版本对比: 入场时机 vs 反手锚点</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+     background:#0f172a;color:#e2e8f0;font-size:13px;line-height:1.6}
+.container{max-width:1440px;margin:0 auto;padding:24px}
+h1{font-size:21px;font-weight:700;color:#f1f5f9;margin-bottom:4px}
+.sub{color:#64748b;font-size:12px;margin-bottom:20px}
+.grid{display:grid;gap:14px}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g2{grid-template-columns:repeat(2,1fr)}
+.card{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:18px}
+.ver-card .ver-header{border-left:3px solid;padding:6px 10px;margin-bottom:12px;
+                       display:flex;align-items:center;gap:8px;border-radius:4px;
+                       background:#0f172a}
+.ver-header strong{font-size:15px;color:#f1f5f9}
+.ver-header small{color:#64748b;font-size:11px}
+.metric-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.m{padding:8px 4px}
+.big{font-size:18px;font-weight:700}
+.pos{color:#22c55e}.neg{color:#ef4444}.neu{color:#94a3b8}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0}
+.chart-wrap{position:relative;height:220px}
+.card h2{font-size:13px;color:#94a3b8;margin-bottom:12px;font-weight:500}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{color:#64748b;font-weight:500;padding:7px 5px;border-bottom:1px solid #334155;text-align:center}
+td{padding:6px 5px;border-bottom:1px solid #1e293b;text-align:center}
+tr:hover td{background:#334155}
+.badge{display:inline-block;padding:1px 5px;border-radius:3px;font-size:10px;
+        background:#3b4a6b;color:#93c5fd}
+.badge.buy{background:#14532d;color:#4ade80}
+.badge.sell{background:#450a0a;color:#f87171}
+.tabs{display:flex;gap:4px;margin-bottom:12px}
+.tab{padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;
+      background:#334155;color:#94a3b8;border:none}
+.tab.active{background:#3b82f6;color:#fff}
+.tab-content{display:none}.tab-content.active{display:block}
+.diff-badge{display:inline-block;padding:2px 6px;border-radius:4px;font-size:11px;
+             background:#1e3a5f;color:#93c5fd;margin-left:6px}
+.insight{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:12px 16px;
+          font-size:12px;line-height:1.8;color:#94a3b8}
+.insight b{color:#e2e8f0}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>v4策略 三版本对比：入场时机 vs 反手锚点</h1>
+  <div class="sub">
+    回测周期: 2026-03-20 ~ 2026-03-30 (7交易日, 真实1分钟数据, 15分钟检查间隔)
+    &nbsp;|&nbsp; V4原版 / V4a(09:30入场) / V4b(入场价反手锚点)
+  </div>
+
+  <!-- 设计差异说明 -->
+  <div class="insight" style="margin-bottom:16px">
+    <b>三版本关键差异：</b><br>
+    <span style="color:#94a3b8">▎</span> <b>V4原版</b>：入场时间=09:45（等15分钟确认），反手锚点=今天开盘价 &nbsp;|&nbsp;
+    <span style="color:#f59e0b">▎</span> <b>V4a</b>：入场时间=<b>09:30</b>（昨收信号直接入场，无延迟），反手锚点=今天开盘价 &nbsp;|&nbsp;
+    <span style="color:#3b82f6">▎</span> <b>V4b</b>：入场时间=09:45，反手锚点=<b>实际入场价</b>（消除盲区，偏离入场价-0.8%即反手）
+  </div>
+
+  <!-- 核心指标卡 -->
+  <div class="grid g3" style="margin-bottom:16px">
+    
+      <div class="card ver-card">
+        <div class="ver-header" style="border-color:#94a3b8">
+          <span class="dot" style="background:#94a3b8"></span>
+          <strong>V4原版</strong>
+          <small>入场09:45 / 反手锚点=今开</small>
+        </div>
+        <div class="metric-grid">
+          <div class="m"><span class="pos big">+0.19%</span><br><small>总收益</small></div>
+          <div class="m"><span class="pos big">+6.30</span><br><small>夏普</small></div>
+          <div class="m"><span class="neg big">-0.04%</span><br><small>最大回撤</small></div>
+          <div class="m"><span class="big">57%</span><br><small>胜率</small></div>
+          <div class="m"><span class="big">1.503</span><br><small>盈亏比</small></div>
+          <div class="m"><span class="neu big">5/2/5/0</span><br><small>开/反/冲/损</small></div>
+        </div>
+      </div>
+      <div class="card ver-card">
+        <div class="ver-header" style="border-color:#f59e0b">
+          <span class="dot" style="background:#f59e0b"></span>
+          <strong>V4a</strong>
+          <small>入场09:30 / 反手锚点=今开</small>
+        </div>
+        <div class="metric-grid">
+          <div class="m"><span class="pos big">+0.04%</span><br><small>总收益</small></div>
+          <div class="m"><span class="neg big">-0.27</span><br><small>夏普</small></div>
+          <div class="m"><span class="neg big">-0.18%</span><br><small>最大回撤</small></div>
+          <div class="m"><span class="big">43%</span><br><small>胜率</small></div>
+          <div class="m"><span class="big">1.176</span><br><small>盈亏比</small></div>
+          <div class="m"><span class="neu big">6/3/6/0</span><br><small>开/反/冲/损</small></div>
+        </div>
+      </div>
+      <div class="card ver-card">
+        <div class="ver-header" style="border-color:#3b82f6">
+          <span class="dot" style="background:#3b82f6"></span>
+          <strong>V4b</strong>
+          <small>入场09:45 / 反手锚点=入场价</small>
+        </div>
+        <div class="metric-grid">
+          <div class="m"><span class="pos big">+0.22%</span><br><small>总收益</small></div>
+          <div class="m"><span class="pos big">+7.67</span><br><small>夏普</small></div>
+          <div class="m"><span class="neg big">-0.04%</span><br><small>最大回撤</small></div>
+          <div class="m"><span class="big">57%</span><br><small>胜率</small></div>
+          <div class="m"><span class="big">1.722</span><br><small>盈亏比</small></div>
+          <div class="m"><span class="neu big">5/1/5/0</span><br><small>开/反/冲/损</small></div>
+        </div>
+      </div>
+  </div>
+
+  <!-- 净值曲线 -->
+  <div class="card" style="margin-bottom:14px">
+    <h2>净值曲线对比</h2>
+    <div class="chart-wrap" style="height:250px"><canvas id="navChart"></canvas></div>
+  </div>
+
+  <!-- 每日盈亏 -->
+  <div class="card" style="margin-bottom:14px">
+    <h2>每日盈亏对比 (元)</h2>
+    <div class="chart-wrap"><canvas id="pnlChart"></canvas></div>
+  </div>
+
+  <!-- 每日明细对比表 -->
+  <div class="card" style="margin-bottom:14px">
+    <h2>每日明细对比（R=反手 H=对冲 S=止损）</h2>
+    <div style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr>
+          <th rowspan="2">日期</th>
+          <th colspan="3">ETF</th>
+          <th colspan="3" style="border-left:1px solid #475569"><span class="dot" style="background:#94a3b8;margin-right:4px"></span>V4原版</th><th colspan="3" style="border-left:1px solid #475569"><span class="dot" style="background:#f59e0b;margin-right:4px"></span>V4a</th><th colspan="3" style="border-left:1px solid #475569"><span class="dot" style="background:#3b82f6;margin-right:4px"></span>V4b</th>
+        </tr>
+        <tr>
+          <th>涨跌</th><th>开</th><th>收</th>
+          <th style="border-left:1px solid #475569">盈亏</th><th>操作</th><th>净值</th><th style="border-left:1px solid #475569">盈亏</th><th>操作</th><th>净值</th><th style="border-left:1px solid #475569">盈亏</th><th>操作</th><th>净值</th>
+        </tr>
+      </thead>
+      <tbody><tr><td>2026-03-20</td><td style='color:#22c55e'>+1.15%</td><td>3.337</td><td>3.341</td><td style='color:#22c55e'>+92.43</td><td>H</td><td style='color:#22c55e'>200,092.43</td><td style='color:#22c55e'>+153.07</td><td>H</td><td style='color:#22c55e'>200,153.07</td><td style='color:#22c55e'>+92.43</td><td>H</td><td style='color:#22c55e'>200,092.43</td></tr>
+<tr><td>2026-03-23</td><td style='color:#ef4444'>-3.38%</td><td>3.300</td><td>3.228</td><td style='color:#22c55e'>+237.01</td><td>H</td><td style='color:#22c55e'>200,329.44</td><td style='color:#22c55e'>+246.59</td><td>H</td><td style='color:#22c55e'>200,399.66</td><td style='color:#22c55e'>+237.01</td><td>H</td><td style='color:#22c55e'>200,329.44</td></tr>
+<tr><td>2026-03-24</td><td style='color:#22c55e'>+0.28%</td><td>3.275</td><td>3.237</td><td style='color:#94a3b8'>+0.00</td><td>-</td><td style='color:#94a3b8'>200,329.44</td><td style='color:#ef4444'>-366.26</td><td>RH</td><td style='color:#ef4444'>200,033.40</td><td style='color:#94a3b8'>+0.00</td><td>-</td><td style='color:#94a3b8'>200,329.44</td></tr>
+<tr><td>2026-03-25</td><td style='color:#22c55e'>+2.16%</td><td>3.279</td><td>3.307</td><td style='color:#22c55e'>+80.98</td><td>H</td><td style='color:#22c55e'>200,410.42</td><td style='color:#22c55e'>+113.47</td><td>H</td><td style='color:#22c55e'>200,146.87</td><td style='color:#22c55e'>+80.98</td><td>H</td><td style='color:#22c55e'>200,410.42</td></tr>
+<tr><td>2026-03-26</td><td style='color:#ef4444'>-1.33%</td><td>3.306</td><td>3.263</td><td style='color:#94a3b8'>+0.00</td><td>-</td><td style='color:#94a3b8'>200,410.42</td><td style='color:#94a3b8'>+0.00</td><td>-</td><td style='color:#94a3b8'>200,146.87</td><td style='color:#94a3b8'>+0.00</td><td>-</td><td style='color:#94a3b8'>200,410.42</td></tr>
+<tr><td>2026-03-27</td><td style='color:#22c55e'>+0.92%</td><td>3.241</td><td>3.293</td><td style='color:#ef4444'>-74.94</td><td>RH</td><td style='color:#ef4444'>200,335.48</td><td style='color:#ef4444'>-39.95</td><td>RH</td><td style='color:#ef4444'>200,106.92</td><td style='color:#ef4444'>-74.94</td><td>RH</td><td style='color:#ef4444'>200,335.48</td></tr>
+<tr><td>2026-03-30</td><td style='color:#ef4444'>-0.88%</td><td>3.242</td><td>3.264</td><td style='color:#22c55e'>+40.24</td><td>RH</td><td style='color:#22c55e'>200,375.72</td><td style='color:#ef4444'>-29.99</td><td>RH</td><td style='color:#ef4444'>200,076.93</td><td style='color:#22c55e'>+105.72</td><td>H</td><td style='color:#22c55e'>200,441.20</td></tr>
+</tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- 交易记录 -->
+  <div class="card">
+    <h2>交易记录详情</h2>
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('tv4')">V4原版</button>
+      <button class="tab" onclick="showTab('tv4a')">V4a (09:30入场)</button>
+      <button class="tab" onclick="showTab('tv4b')">V4b (入场价锚点)</button>
+    </div>
+    <div id="tv4" class="tab-content active">
+      <div style="overflow-x:auto;max-height:340px;overflow-y:auto">
+      <table>
+        <thead><tr><th>日期</th><th>时间</th><th>操作</th><th>合约</th><th>行权价</th><th>权利金</th><th>盈亏</th><th>原因</th></tr></thead>
+        <tbody><tr><td>2026-03-20</td><td>09:45</td><td><span class='badge buy'>买入开仓</span></td><td>创业板ETF认4月3350</td><td>3.35</td><td>0.2155</td><td>-</td><td style='color:#94a3b8;font-size:11px'>09:45确认↑1.03%</td></tr><tr><td>2026-03-20</td><td>13:00</td><td><span class='badge sell'>卖出对冲</span></td><td>创业板ETF认4月3500</td><td>3.5</td><td>0.1670</td><td>-</td><td style='color:#94a3b8;font-size:11px'>连续2次浮盈→对冲</td></tr><tr><td>2026-03-20</td><td>14:45</td><td><span class='badge sell'>卖出平仓</span></td><td>创业板ETF认4月3350</td><td>3.35</td><td>0.2005</td><td><span style='color:#ef4444'>-155.73</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-20</td><td>14:45</td><td><span class='badge buy'>买入平仓</span></td><td>创业板ETF认4月3500</td><td>3.5</td><td>0.1417</td><td><span style='color:#22c55e'>+248.16</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-23</td><td>09:45</td><td><span class='badge buy'>买入开仓</span></td><td>创业板ETF认4月3300</td><td>3.3</td><td>0.1711</td><td>-</td><td style='color:#94a3b8;font-size:11px'>09:45确认↓-1.23%</td></tr><tr><td>2026-03-23</td><td>11:30</td><td><span class='badge sell'>卖出对冲</span></td><td>创业板ETF认4月3150</td><td>3.15</td><td>0.1133</td><td>-</td><td style='color:#94a3b8;font-size:11px'>连续2次浮盈→对冲</td></tr><tr><td>2026-03-23</td><td>14:45</td><td><span class='badge sell'>卖出平仓</span></td><td>创业板ETF认4月3300</td><td>3.3</td><td>0.2141</td><td><span style='color:#22c55e'>+425.36</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-23</td><td>14:45</td><td><span class='badge buy'>买入平仓</span></td><td>创业板ETF认4月3150</td><td>3.15</td><td>0.1316</td><td><span style='color:#ef4444'>-188.35</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-25</td><td>09:45</td><td><span class='badge buy'>买入开仓</span></td><td>创业板ETF认4月3300</td><td>3.3</td><td>0.1818</td><td>-</td><td style='color:#94a3b8;font-size:11px'>09:45确认↑1.30%</td></tr><tr><td>2026-03-25</td><td>13:45</td><td><span class='badge sell'>卖出对冲</span></td><td>创业板ETF认4月3400</td><td>3.4</td><td>0.1494</td><td>-</td><td style='color:#94a3b8;font-size:11px'>连续2次浮盈→对冲</td></tr><tr><td>2026-03-25</td><td>14:45</td><td><span class='badge sell'>卖出平仓</span></td><td>创业板ETF认4月3300</td><td>3.3</td><td>0.1873</td><td><span style='color:#22c55e'>+50.14</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-25</td><td>14:45</td><td><span class='badge buy'>买入平仓</span></td><td>创业板ETF认4月3400</td><td>3.4</td><td>0.1458</td><td><span style='color:#22c55e'>+30.84</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-27</td><td>09:45</td><td><span class='badge buy'>买入开仓</span></td><td>创业板ETF认4月3250</td><td>3.25</td><td>0.1659</td><td>-</td><td style='color:#94a3b8;font-size:11px'>09:45确认↓-0.67%</td></tr><tr><td>2026-03-27</td><td>10:30</td><td><span class='badge sell'>反手平仓</span></td><td>创业板ETF认4月3250</td><td>3.25</td><td>0.1477</td><td><span style='color:#ef4444'>-186.55</span></td><td style='color:#94a3b8;font-size:11px'>相对今开偏0.93%反手</td></tr><tr><td>2026-03-27</td><td>10:30</td><td><span class='badge sell'>反手开仓</span></td><td>创业板ETF认4月3250</td><td>3.25</td><td>0.1893</td><td>-</td><td style='color:#94a3b8;font-size:11px'>反手→认购</td></tr><tr><td>2026-03-27</td><td>13:30</td><td><span class='badge sell'>卖出对冲</span></td><td>创业板ETF认4月3400</td><td>3.4</td><td>0.1381</td><td>-</td><td style='color:#94a3b8;font-size:11px'>连续2次浮盈→对冲</td></tr><tr><td>2026-03-27</td><td>14:45</td><td><span class='badge sell'>卖出平仓</span></td><td>创业板ETF认4月3250</td><td>3.25</td><td>0.1963</td><td><span style='color:#22c55e'>+64.94</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-27</td><td>14:45</td><td><span class='badge buy'>买入平仓</span></td><td>创业板ETF认4月3400</td><td>3.4</td><td>0.1329</td><td><span style='color:#22c55e'>+46.67</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-30</td><td>09:45</td><td><span class='badge buy'>买入开仓</span></td><td>创业板ETF认4月3250</td><td>3.25</td><td>0.1466</td><td>-</td><td style='color:#94a3b8;font-size:11px'>09:45确认↓-1.55%</td></tr><tr><td>2026-03-30</td><td>10:15</td><td><span class='badge sell'>卖出对冲</span></td><td>创业板ETF认4月3150</td><td>3.15</td><td>0.1112</td><td>-</td><td style='color:#94a3b8;font-size:11px'>连续2次浮盈→对冲</td></tr><tr><td>2026-03-30</td><td>11:30</td><td><span class='badge sell'>反手平仓</span></td><td>创业板ETF认4月3250</td><td>3.25</td><td>0.1412</td><td><span style='color:#ef4444'>-59.58</span></td><td style='color:#94a3b8;font-size:11px'>相对今开偏0.80%反手</td></tr><tr><td>2026-03-30</td><td>11:30</td><td><span class='badge sell'>反手开仓</span></td><td>创业板ETF认4月3250</td><td>3.25</td><td>0.1787</td><td>-</td><td style='color:#94a3b8;font-size:11px'>反手→认购</td></tr><tr><td>2026-03-30</td><td>14:45</td><td><span class='badge buy'>买入平仓</span></td><td>创业板ETF认4月3150</td><td>3.15</td><td>0.0966</td><td><span style='color:#22c55e'>+140.44</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-30</td><td>14:45</td><td><span class='badge sell'>卖出平仓</span></td><td>创业板ETF认4月3250</td><td>3.25</td><td>0.1752</td><td><span style='color:#ef4444'>-40.62</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr></tbody>
+      </table></div>
+    </div>
+    <div id="tv4a" class="tab-content">
+      <div style="overflow-x:auto;max-height:340px;overflow-y:auto">
+      <table>
+        <thead><tr><th>日期</th><th>时间</th><th>操作</th><th>合约</th><th>行权价</th><th>权利金</th><th>盈亏</th><th>原因</th></tr></thead>
+        <tbody><tr><td>2026-03-20</td><td>09:30</td><td><span class='badge buy'>买入开仓</span></td><td>创业板ETF认4月3350</td><td>3.35</td><td>0.1965</td><td>-</td><td style='color:#94a3b8;font-size:11px'>09:30直接↑1.03%</td></tr><tr><td>2026-03-20</td><td>10:00</td><td><span class='badge sell'>卖出对冲</span></td><td>创业板ETF认4月3500</td><td>3.5</td><td>0.1540</td><td>-</td><td style='color:#94a3b8;font-size:11px'>连续2次浮盈→对冲</td></tr><tr><td>2026-03-20</td><td>14:45</td><td><span class='badge sell'>卖出平仓</span></td><td>创业板ETF认4月3350</td><td>3.35</td><td>0.2005</td><td><span style='color:#22c55e'>+34.85</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-20</td><td>14:45</td><td><span class='badge buy'>买入平仓</span></td><td>创业板ETF认4月3500</td><td>3.5</td><td>0.1417</td><td><span style='color:#22c55e'>+118.22</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-23</td><td>09:30</td><td><span class='badge buy'>买入开仓</span></td><td>创业板ETF认4月3300</td><td>3.3</td><td>0.1701</td><td>-</td><td style='color:#94a3b8;font-size:11px'>09:30直接↓-1.23%</td></tr><tr><td>2026-03-23</td><td>11:30</td><td><span class='badge sell'>卖出对冲</span></td><td>创业板ETF认4月3150</td><td>3.15</td><td>0.1133</td><td>-</td><td style='color:#94a3b8;font-size:11px'>连续2次浮盈→对冲</td></tr><tr><td>2026-03-23</td><td>14:45</td><td><span class='badge sell'>卖出平仓</span></td><td>创业板ETF认4月3300</td><td>3.3</td><td>0.2141</td><td><span style='color:#22c55e'>+434.94</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-23</td><td>14:45</td><td><span class='badge buy'>买入平仓</span></td><td>创业板ETF认4月3150</td><td>3.15</td><td>0.1316</td><td><span style='color:#ef4444'>-188.35</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-24</td><td>09:30</td><td><span class='badge buy'>买入开仓</span></td><td>创业板ETF认4月3250</td><td>3.25</td><td>0.1998</td><td>-</td><td style='color:#94a3b8;font-size:11px'>09:30直接↑1.46%</td></tr><tr><td>2026-03-24</td><td>09:45</td><td><span class='badge sell'>反手平仓</span></td><td>创业板ETF认4月3250</td><td>3.25</td><td>0.1603</td><td><span style='color:#ef4444'>-399.34</span></td><td style='color:#94a3b8;font-size:11px'>相对今开偏-2.41%反手</td></tr><tr><td>2026-03-24</td><td>09:45</td><td><span class='badge sell'>反手开仓</span></td><td>创业板ETF认4月3200</td><td>3.2</td><td>0.1646</td><td>-</td><td style='color:#94a3b8;font-size:11px'>反手→认沽</td></tr><tr><td>2026-03-24</td><td>13:30</td><td><span class='badge sell'>卖出对冲</span></td><td>创业板ETF认4月3050</td><td>3.05</td><td>0.1034</td><td>-</td><td style='color:#94a3b8;font-size:11px'>连续2次浮盈→对冲</td></tr><tr><td>2026-03-24</td><td>14:45</td><td><span class='badge sell'>卖出平仓</span></td><td>创业板ETF认4月3200</td><td>3.2</td><td>0.1479</td><td><span style='color:#ef4444'>-172.41</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-24</td><td>14:45</td><td><span class='badge buy'>买入平仓</span></td><td>创业板ETF认4月3050</td><td>3.05</td><td>0.0824</td><td><span style='color:#22c55e'>+205.49</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-25</td><td>09:30</td><td><span class='badge buy'>买入开仓</span></td><td>创业板ETF认4月3300</td><td>3.3</td><td>0.1763</td><td>-</td><td style='color:#94a3b8;font-size:11px'>09:30直接↑1.30%</td></tr><tr><td>2026-03-25</td><td>10:15</td><td><span class='badge sell'>卖出对冲</span></td><td>创业板ETF认4月3400</td><td>3.4</td><td>0.1472</td><td>-</td><td style='color:#94a3b8;font-size:11px'>连续2次浮盈→对冲</td></tr><tr><td>2026-03-25</td><td>14:45</td><td><span class='badge sell'>卖出平仓</span></td><td>创业板ETF认4月3300</td><td>3.3</td><td>0.1873</td><td><span style='color:#22c55e'>+104.62</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-25</td><td>14:45</td><td><span class='badge buy'>买入平仓</span></td><td>创业板ETF认4月3400</td><td>3.4</td><td>0.1458</td><td><span style='color:#22c55e'>+8.85</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-27</td><td>09:30</td><td><span class='badge buy'>买入开仓</span></td><td>创业板ETF认4月3250</td><td>3.25</td><td>0.1624</td><td>-</td><td style='color:#94a3b8;font-size:11px'>09:30直接↓-0.67%</td></tr><tr><td>2026-03-27</td><td>10:30</td><td><span class='badge sell'>反手平仓</span></td><td>创业板ETF认4月3250</td><td>3.25</td><td>0.1477</td><td><span style='color:#ef4444'>-151.56</span></td><td style='color:#94a3b8;font-size:11px'>相对今开偏0.93%反手</td></tr><tr><td>2026-03-27</td><td>10:30</td><td><span class='badge sell'>反手开仓</span></td><td>创业板ETF认4月3250</td><td>3.25</td><td>0.1893</td><td>-</td><td style='color:#94a3b8;font-size:11px'>反手→认购</td></tr><tr><td>2026-03-27</td><td>13:30</td><td><span class='badge sell'>卖出对冲</span></td><td>创业板ETF认4月3400</td><td>3.4</td><td>0.1381</td><td>-</td><td style='color:#94a3b8;font-size:11px'>连续2次浮盈→对冲</td></tr><tr><td>2026-03-27</td><td>14:45</td><td><span class='badge sell'>卖出平仓</span></td><td>创业板ETF认4月3250</td><td>3.25</td><td>0.1963</td><td><span style='color:#22c55e'>+64.94</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-27</td><td>14:45</td><td><span class='badge buy'>买入平仓</span></td><td>创业板ETF认4月3400</td><td>3.4</td><td>0.1329</td><td><span style='color:#22c55e'>+46.67</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-30</td><td>09:30</td><td><span class='badge buy'>买入开仓</span></td><td>创业板ETF认4月3250</td><td>3.25</td><td>0.1540</td><td>-</td><td style='color:#94a3b8;font-size:11px'>09:30直接↓-1.55%</td></tr><tr><td>2026-03-30</td><td>10:30</td><td><span class='badge sell'>卖出对冲</span></td><td>创业板ETF认4月3150</td><td>3.15</td><td>0.1115</td><td>-</td><td style='color:#94a3b8;font-size:11px'>连续2次浮盈→对冲</td></tr><tr><td>2026-03-30</td><td>11:30</td><td><span class='badge sell'>反手平仓</span></td><td>创业板ETF认4月3250</td><td>3.25</td><td>0.1412</td><td><span style='color:#ef4444'>-133.65</span></td><td style='color:#94a3b8;font-size:11px'>相对今开偏0.80%反手</td></tr><tr><td>2026-03-30</td><td>11:30</td><td><span class='badge sell'>反手开仓</span></td><td>创业板ETF认4月3250</td><td>3.25</td><td>0.1787</td><td>-</td><td style='color:#94a3b8;font-size:11px'>反手→认购</td></tr><tr><td>2026-03-30</td><td>14:45</td><td><span class='badge buy'>买入平仓</span></td><td>创业板ETF认4月3150</td><td>3.15</td><td>0.0966</td><td><span style='color:#22c55e'>+144.28</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-30</td><td>14:45</td><td><span class='badge sell'>卖出平仓</span></td><td>创业板ETF认4月3250</td><td>3.25</td><td>0.1752</td><td><span style='color:#ef4444'>-40.62</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr></tbody>
+      </table></div>
+    </div>
+    <div id="tv4b" class="tab-content">
+      <div style="overflow-x:auto;max-height:340px;overflow-y:auto">
+      <table>
+        <thead><tr><th>日期</th><th>时间</th><th>操作</th><th>合约</th><th>行权价</th><th>权利金</th><th>盈亏</th><th>原因</th></tr></thead>
+        <tbody><tr><td>2026-03-20</td><td>09:45</td><td><span class='badge buy'>买入开仓</span></td><td>创业板ETF认4月3350</td><td>3.35</td><td>0.2155</td><td>-</td><td style='color:#94a3b8;font-size:11px'>09:45确认↑1.03%</td></tr><tr><td>2026-03-20</td><td>13:00</td><td><span class='badge sell'>卖出对冲</span></td><td>创业板ETF认4月3500</td><td>3.5</td><td>0.1670</td><td>-</td><td style='color:#94a3b8;font-size:11px'>连续2次浮盈→对冲</td></tr><tr><td>2026-03-20</td><td>14:45</td><td><span class='badge sell'>卖出平仓</span></td><td>创业板ETF认4月3350</td><td>3.35</td><td>0.2005</td><td><span style='color:#ef4444'>-155.73</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-20</td><td>14:45</td><td><span class='badge buy'>买入平仓</span></td><td>创业板ETF认4月3500</td><td>3.5</td><td>0.1417</td><td><span style='color:#22c55e'>+248.16</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-23</td><td>09:45</td><td><span class='badge buy'>买入开仓</span></td><td>创业板ETF认4月3300</td><td>3.3</td><td>0.1711</td><td>-</td><td style='color:#94a3b8;font-size:11px'>09:45确认↓-1.23%</td></tr><tr><td>2026-03-23</td><td>11:30</td><td><span class='badge sell'>卖出对冲</span></td><td>创业板ETF认4月3150</td><td>3.15</td><td>0.1133</td><td>-</td><td style='color:#94a3b8;font-size:11px'>连续2次浮盈→对冲</td></tr><tr><td>2026-03-23</td><td>14:45</td><td><span class='badge sell'>卖出平仓</span></td><td>创业板ETF认4月3300</td><td>3.3</td><td>0.2141</td><td><span style='color:#22c55e'>+425.36</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-23</td><td>14:45</td><td><span class='badge buy'>买入平仓</span></td><td>创业板ETF认4月3150</td><td>3.15</td><td>0.1316</td><td><span style='color:#ef4444'>-188.35</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-25</td><td>09:45</td><td><span class='badge buy'>买入开仓</span></td><td>创业板ETF认4月3300</td><td>3.3</td><td>0.1818</td><td>-</td><td style='color:#94a3b8;font-size:11px'>09:45确认↑1.30%</td></tr><tr><td>2026-03-25</td><td>13:45</td><td><span class='badge sell'>卖出对冲</span></td><td>创业板ETF认4月3400</td><td>3.4</td><td>0.1494</td><td>-</td><td style='color:#94a3b8;font-size:11px'>连续2次浮盈→对冲</td></tr><tr><td>2026-03-25</td><td>14:45</td><td><span class='badge sell'>卖出平仓</span></td><td>创业板ETF认4月3300</td><td>3.3</td><td>0.1873</td><td><span style='color:#22c55e'>+50.14</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-25</td><td>14:45</td><td><span class='badge buy'>买入平仓</span></td><td>创业板ETF认4月3400</td><td>3.4</td><td>0.1458</td><td><span style='color:#22c55e'>+30.84</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-27</td><td>09:45</td><td><span class='badge buy'>买入开仓</span></td><td>创业板ETF认4月3250</td><td>3.25</td><td>0.1659</td><td>-</td><td style='color:#94a3b8;font-size:11px'>09:45确认↓-0.67%</td></tr><tr><td>2026-03-27</td><td>10:30</td><td><span class='badge sell'>反手平仓</span></td><td>创业板ETF认4月3250</td><td>3.25</td><td>0.1477</td><td><span style='color:#ef4444'>-186.55</span></td><td style='color:#94a3b8;font-size:11px'>相对入场价偏1.14%反手</td></tr><tr><td>2026-03-27</td><td>10:30</td><td><span class='badge sell'>反手开仓</span></td><td>创业板ETF认4月3250</td><td>3.25</td><td>0.1893</td><td>-</td><td style='color:#94a3b8;font-size:11px'>反手→认购</td></tr><tr><td>2026-03-27</td><td>13:30</td><td><span class='badge sell'>卖出对冲</span></td><td>创业板ETF认4月3400</td><td>3.4</td><td>0.1381</td><td>-</td><td style='color:#94a3b8;font-size:11px'>连续2次浮盈→对冲</td></tr><tr><td>2026-03-27</td><td>14:45</td><td><span class='badge sell'>卖出平仓</span></td><td>创业板ETF认4月3250</td><td>3.25</td><td>0.1963</td><td><span style='color:#22c55e'>+64.94</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-27</td><td>14:45</td><td><span class='badge buy'>买入平仓</span></td><td>创业板ETF认4月3400</td><td>3.4</td><td>0.1329</td><td><span style='color:#22c55e'>+46.67</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-30</td><td>09:45</td><td><span class='badge buy'>买入开仓</span></td><td>创业板ETF认4月3250</td><td>3.25</td><td>0.1466</td><td>-</td><td style='color:#94a3b8;font-size:11px'>09:45确认↓-1.55%</td></tr><tr><td>2026-03-30</td><td>10:15</td><td><span class='badge sell'>卖出对冲</span></td><td>创业板ETF认4月3150</td><td>3.15</td><td>0.1112</td><td>-</td><td style='color:#94a3b8;font-size:11px'>连续2次浮盈→对冲</td></tr><tr><td>2026-03-30</td><td>14:45</td><td><span class='badge sell'>卖出平仓</span></td><td>创业板ETF认4月3250</td><td>3.25</td><td>0.1437</td><td><span style='color:#ef4444'>-34.72</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr><tr><td>2026-03-30</td><td>14:45</td><td><span class='badge buy'>买入平仓</span></td><td>创业板ETF认4月3150</td><td>3.15</td><td>0.0966</td><td><span style='color:#22c55e'>+140.44</span></td><td style='color:#94a3b8;font-size:11px'>14:45强平</td></tr></tbody>
+      </table></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const dates = ["2026-03-20", "2026-03-23", "2026-03-24", "2026-03-25", "2026-03-26", "2026-03-27", "2026-03-30"];
+const navs = {"v4_orig":[1.000462, 1.001647, 1.001647, 1.002052, 1.002052, 1.001677, 1.001879],"v4a":[1.000765, 1.001998, 1.000167, 1.000734, 1.000734, 1.000535, 1.000385],"v4b":[1.000462, 1.001647, 1.001647, 1.002052, 1.002052, 1.001677, 1.002206]};
+const pnls = {"v4_orig":[92.43, 237.01, 0.0, 80.98, 0.0, -74.94, 40.24],"v4a":[153.07, 246.59, -366.26, 113.47, 0.0, -39.95, -29.99],"v4b":[92.43, 237.01, 0.0, 80.98, 0.0, -74.94, 105.72]};
+const cols = {"v4_orig":"#94a3b8","v4a":"#f59e0b","v4b":"#3b82f6"};
+const lbls = {"v4_orig":"V4原版","v4a":"V4a(09:30)","v4b":"V4b(入场锚)"};
+const axOpts = {
+  x:{grid:{color:'#1e293b'},ticks:{color:'#64748b',font:{size:10}}},
+  y:{grid:{color:'#334155'},ticks:{color:'#64748b',font:{size:10}}}
+};
+new Chart(document.getElementById('navChart'),{
+  type:'line',
+  data:{labels:dates,datasets:Object.keys(navs).map(k=>({
+    label:lbls[k],data:navs[k],borderColor:cols[k],
+    backgroundColor:cols[k]+'20',fill:true,tension:0.35,
+    pointRadius:4,borderWidth:2.5,pointBackgroundColor:cols[k]
+  })) },
+  options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:true,labels:{color:'#94a3b8',font:{size:11}}}},
+    scales:{...axOpts,y:{...axOpts.y,ticks:{...axOpts.y.ticks,callback:v=>(v*100).toFixed(2)+'%'}}}
+  }
+});
+new Chart(document.getElementById('pnlChart'),{
+  type:'bar',
+  data:{labels:dates,datasets:Object.keys(pnls).map(k=>({
+    label:lbls[k],data:pnls[k],backgroundColor:cols[k]+'88',borderColor:cols[k],borderWidth:1
+  })) },
+  options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:true,labels:{color:'#94a3b8',font:{size:11}}}},
+    scales:axOpts
+  }
+});
+function showTab(id){
+  document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(e=>e.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>
+</body>
+</html>
