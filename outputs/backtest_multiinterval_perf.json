@@ -1,0 +1,47 @@
+{
+  "5min": {
+    "label": "5分钟",
+    "n_checkpoints": 47,
+    "entry_time": "09:45",
+    "final_cap": 200338.81000000003,
+    "total_ret": 0.001694050000000134,
+    "sharpe": 6.756914823326832,
+    "max_dd": -0.000158999999999994,
+    "win_rate": 0.5714285714285714,
+    "n_open": 5,
+    "n_rev": 2,
+    "n_hedge": 4,
+    "n_sl": 0,
+    "n_days": 7
+  },
+  "10min": {
+    "label": "10分钟",
+    "n_checkpoints": 24,
+    "entry_time": "09:50",
+    "final_cap": 200302.52,
+    "total_ret": 0.0015125999999999475,
+    "sharpe": 4.971744196073676,
+    "max_dd": -0.00030897659199989185,
+    "win_rate": 0.42857142857142855,
+    "n_open": 5,
+    "n_rev": 2,
+    "n_hedge": 4,
+    "n_sl": 0,
+    "n_days": 7
+  },
+  "15min": {
+    "label": "15分钟",
+    "n_checkpoints": 17,
+    "entry_time": "09:45",
+    "final_cap": 200375.72,
+    "total_ret": 0.0018786000000000059,
+    "sharpe": 6.297332820423318,
+    "max_dd": -0.0003739999999998874,
+    "win_rate": 0.5714285714285714,
+    "n_open": 5,
+    "n_rev": 2,
+    "n_hedge": 5,
+    "n_sl": 0,
+    "n_days": 7
+  }
+}
