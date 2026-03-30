@@ -1,0 +1,31 @@
+# 数据库与缓存
+*.db
+*.sqlite
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# VeighNA数据库目录
+vnpy_data/
+
+# 回测日志
+outputs/backtest_v*.log
+
+# 大型输出文件（CSV数据）不纳入版本控制
+outputs/etf_159915_daily_2026Q1.csv
+outputs/option_159915_contracts.csv
+outputs/option_159915_greeks.csv
+outputs/backtest_v2_*.csv
+outputs/backtest_v3_*.csv
+
+# 保留重要输出
+!outputs/backtest_report_v3.html
+!outputs/backtest_v3_perf.json
+!outputs/svi_parameters.json
+
+# 临时文件
+.DS_Store
+*.egg-info/
+dist/
+build/

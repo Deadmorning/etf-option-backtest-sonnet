@@ -1,0 +1,2127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>创业板ETF期权 动态换月策略 回测报告 v3</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI','PingFang SC',sans-serif;background:#0c1220;color:#e2e8f0}
+.hdr{background:linear-gradient(135deg,#0a1f38,#0c1220);padding:28px 48px;border-bottom:1px solid #1e3a5f}
+.hdr h1{font-size:22px;color:#60a5fa;margin-bottom:8px}
+.badge{display:inline-block;background:#1e3a5f;border:1px solid #2563eb;border-radius:4px;
+       padding:2px 10px;font-size:11px;color:#93c5fd;margin:2px 4px 2px 0}
+.badge.v{background:#1e3d1e;border-color:#16a34a;color:#86efac}
+.badge.w{background:#3a2a0a;border-color:#d97706;color:#fcd34d}
+.container{max-width:1480px;margin:0 auto;padding:24px 48px}
+.st{font-size:12px;color:#60a5fa;border-left:3px solid #2563eb;padding-left:12px;
+    margin:28px 0 14px;letter-spacing:.8px;text-transform:uppercase;font-weight:600}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:20px}
+.card{background:#1a2535;border:1px solid #253347;border-radius:8px;padding:16px;text-align:center}
+.card .lbl{font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}
+.card .val{font-size:20px;font-weight:700}
+.pos{color:#34d399} .neg{color:#f87171} .neu{color:#94a3b8}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
+.box{background:#1a2535;border:1px solid #253347;border-radius:8px;padding:18px}
+.box h3{font-size:11px;color:#64748b;margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px}
+.tw{background:#1a2535;border:1px solid #253347;border-radius:8px;overflow:hidden;margin-bottom:18px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead{background:#0c1220}
+th{padding:9px 12px;text-align:right;color:#475569;font-weight:600;font-size:11px}
+th:first-child,th:nth-child(2),th:nth-child(3){text-align:left}
+td{padding:8px 12px;border-top:1px solid #0f1e30;text-align:right}
+td:first-child,td:nth-child(2),td:nth-child(3){text-align:left}
+tr:hover{background:#111e2e}
+.tag{display:inline-block;padding:1px 7px;border-radius:3px;font-size:11px;white-space:nowrap}
+.tag.buy{background:#1d3a7a;color:#93c5fd}
+.tag.rev-c{background:#7a2c1d;color:#fca5a5}
+.tag.rev-o{background:#7a4a1d;color:#fcd9a4}
+.tag.hdg{background:#1d5a2c;color:#86efac}
+.tag.clr{background:#1e293b;color:#64748b}
+.tag.c{background:#1d3a7a;color:#93c5fd}
+.tag.p{background:#4a1d7a;color:#ddd6fe}
+.tag.n{background:#1e293b;color:#64748b}
+.note{background:#0f2237;border:1px solid #1e3a5f;border-radius:8px;padding:14px 18px;margin-bottom:18px;font-size:13px;line-height:1.9}
+.note h4{color:#60a5fa;margin-bottom:8px;font-size:14px}
+.note ul{padding-left:20px;color:#94a3b8}
+.note li{margin-bottom:3px}
+.note strong{color:#e2e8f0}
+.roll-badge{display:inline-block;background:#3a2a0a;border:1px solid #d97706;color:#fcd34d;
+            border-radius:3px;padding:1px 6px;font-size:10px;margin-left:4px}
+.footer{text-align:center;padding:20px;color:#334155;font-size:11px;
+         border-top:1px solid #1a2535;margin-top:40px}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <h1>创业板ETF (159915) 期权策略回测报告</h1>
+  <div style="margin-bottom:10px">
+    <span class="badge v">v3 动态换月</span>
+    <span class="badge">2026年Q1</span>
+    <span class="badge">1月→2月→3月→4月 滚动</span>
+    <span class="badge">Black-76 实时重定价</span>
+    <span class="badge w">距到期≤5交易日换月</span>
+    <span class="badge">每30分钟验证</span>
+    <span class="badge">对冲阈值5%</span>
+  </div>
+  <p style="color:#64748b;font-size:13px">
+    1月用当月合约 → 1/21换2月合约 → 2/10换3月合约 → 3/18换4月合约 | 行权价按当日ETF价格动态生成(0.1间距)
+  </p>
+</div>
+
+<div class="container">
+
+<div class="note">
+  <h4>v2 → v3 核心改进：动态合约换月</h4>
+  <ul>
+    <li><strong>v2问题</strong>：全程固定使用4月到期合约，1月交易时T≈90天，时间价值过高，与真实交易不符</li>
+    <li><strong>v3改进</strong>：按换月规则动态选择合约 — 1月用1月合约(T≈20天)、2月用2月合约(T≈25天)等</li>
+    <li><strong>换月节点</strong>：1/21(1月→2月)、2/10(2月→3月)、3/18(3月→4月)，共3次换月</li>
+    <li><strong>IV调整</strong>：近月合约期限溢价更高（短期IV > 长期IV），反映真实市场波动结构</li>
+    <li><strong>近月期权效果</strong>：T小 → Gamma大 → 价格对标的敏感度高 → 对冲收益更显著</li>
+  </ul>
+</div>
+
+<div class="st">核心绩效指标</div>
+<div class="cards">
+  <div class="card"><div class="lbl">期末净值</div><div class="val neu">¥199,806</div></div>
+  <div class="card"><div class="lbl">总收益率</div><div class="val neg">-0.10%</div></div>
+  <div class="card"><div class="lbl">年化收益率</div><div class="val neg">-0.45%</div></div>
+  <div class="card"><div class="lbl">夏普比率</div><div class="val pos">-2.825</div></div>
+  <div class="card"><div class="lbl">最大回撤</div><div class="val neg">-0.44%</div></div>
+  <div class="card"><div class="lbl">胜率</div><div class="val neu">29.6%</div></div>
+  <div class="card"><div class="lbl">盈亏比</div><div class="val pos">0.779</div></div>
+  <div class="card"><div class="lbl">总交易笔数</div><div class="val neu">128</div></div>
+  <div class="card"><div class="lbl">开仓</div><div class="val neu">30</div></div>
+  <div class="card"><div class="lbl">日内反手</div><div class="val neg">15</div></div>
+  <div class="card"><div class="lbl">对冲开仓</div><div class="val pos">19</div></div>
+  <div class="card"><div class="lbl">换月次数</div><div class="val neu">3</div></div>
+</div>
+
+<div class="row2">
+  <div class="box">
+    <h3>策略累计净值（换月节点标注）</h3>
+    <canvas id="navC" height="220"></canvas>
+  </div>
+  <div class="box">
+    <h3>ETF 159915 收盘价</h3>
+    <canvas id="etfC" height="220"></canvas>
+  </div>
+</div>
+
+<div class="row3">
+  <div class="box">
+    <h3>每日盈亏 (¥)</h3>
+    <canvas id="pnlC" height="200"></canvas>
+  </div>
+  <div class="box">
+    <h3>回撤曲线 (%)</h3>
+    <canvas id="ddC"  height="200"></canvas>
+  </div>
+  <div class="box">
+    <h3>月度盈亏 & 胜率</h3>
+    <canvas id="mnthC" height="200"></canvas>
+  </div>
+</div>
+
+<div class="row2">
+  <div class="box">
+    <h3>反手时间分布（日内节点）</h3>
+    <canvas id="revC" height="180"></canvas>
+  </div>
+  <div class="box">
+    <h3>对冲触发时间分布（日内节点）</h3>
+    <canvas id="hdgC" height="180"></canvas>
+  </div>
+</div>
+
+<div class="st">合约换月时间线</div>
+<div class="tw">
+<table>
+  <thead><tr>
+    <th>日期</th><th>使用合约</th><th>ETF开盘</th><th>ETF收盘</th>
+    <th>信号</th><th>反手</th><th>对冲</th><th>当日盈亏</th><th>累计净值</th>
+  </tr></thead>
+  <tbody>
+
+    <tr>
+      <td>2026-01-06</td>
+      <td><span style="color:#94a3b8">1月合约(剩16交易日)</span></td>
+      <td>3.278</td><td>3.303</td>
+      <td><span class="tag n">观望</span></td><td></td><td></td>
+      <td class="neu">¥0.00</td>
+      <td>¥200,000.00</td>
+    </tr>
+    <tr>
+      <td>2026-01-07</td>
+      <td><span style="color:#94a3b8">1月合约(剩15交易日)</span></td>
+      <td>3.311</td><td>3.311</td>
+      <td><span class="tag n">观望</span></td><td></td><td></td>
+      <td class="neu">¥0.00</td>
+      <td>¥200,000.00</td>
+    </tr>
+    <tr>
+      <td>2026-01-08</td>
+      <td><span style="color:#94a3b8">1月合约(剩14交易日)</span></td>
+      <td>3.291</td><td>3.287</td>
+      <td><span class="tag p">认沽↓</span></td><td></td><td><span class="tag hdg">✓对冲</span></td>
+      <td class="pos">¥64.70</td>
+      <td>¥200,064.70</td>
+    </tr>
+    <tr>
+      <td>2026-01-09</td>
+      <td><span style="color:#94a3b8">1月合约(剩13交易日)</span></td>
+      <td>3.269</td><td>3.314</td>
+      <td><span class="tag p">认沽↓</span></td><td><span class="tag rev-c">✓反手</span></td><td><span class="tag hdg">✓对冲</span></td>
+      <td class="neg">¥-29.60</td>
+      <td>¥200,035.10</td>
+    </tr>
+    <tr>
+      <td>2026-01-12</td>
+      <td><span style="color:#94a3b8">1月合约(剩12交易日)</span></td>
+      <td>3.314</td><td>3.371</td>
+      <td><span class="tag n">观望</span></td><td></td><td></td>
+      <td class="neu">¥0.00</td>
+      <td>¥200,035.10</td>
+    </tr>
+    <tr>
+      <td>2026-01-13</td>
+      <td><span style="color:#94a3b8">1月合约(剩11交易日)</span></td>
+      <td>3.372</td><td>3.306</td>
+      <td><span class="tag n">观望</span></td><td></td><td></td>
+      <td class="neu">¥0.00</td>
+      <td>¥200,035.10</td>
+    </tr>
+    <tr>
+      <td>2026-01-14</td>
+      <td><span style="color:#94a3b8">1月合约(剩10交易日)</span></td>
+      <td>3.307</td><td>3.332</td>
+      <td><span class="tag n">观望</span></td><td></td><td></td>
+      <td class="neu">¥0.00</td>
+      <td>¥200,035.10</td>
+    </tr>
+    <tr>
+      <td>2026-01-15</td>
+      <td><span style="color:#94a3b8">1月合约(剩9交易日)</span></td>
+      <td>3.306</td><td>3.352</td>
+      <td><span class="tag p">认沽↓</span></td><td><span class="tag rev-c">✓反手</span></td><td></td>
+      <td class="neg">¥-180.98</td>
+      <td>¥199,854.12</td>
+    </tr>
+    <tr>
+      <td>2026-01-16</td>
+      <td><span style="color:#94a3b8">1月合约(剩8交易日)</span></td>
+      <td>3.382</td><td>3.346</td>
+      <td><span class="tag c">认购↑</span></td><td><span class="tag rev-c">✓反手</span></td><td></td>
+      <td class="neg">¥-121.80</td>
+      <td>¥199,732.32</td>
+    </tr>
+    <tr>
+      <td>2026-01-19</td>
+      <td><span style="color:#94a3b8">1月合约(剩7交易日)</span></td>
+      <td>3.327</td><td>3.318</td>
+      <td><span class="tag p">认沽↓</span></td><td></td><td><span class="tag hdg">✓对冲</span></td>
+      <td class="pos">¥61.60</td>
+      <td>¥199,793.92</td>
+    </tr>
+    <tr>
+      <td>2026-01-20</td>
+      <td><span style="color:#94a3b8">1月合约(剩6交易日)</span></td>
+      <td>3.319</td><td>3.263</td>
+      <td><span class="tag n">观望</span></td><td></td><td></td>
+      <td class="neu">¥0.00</td>
+      <td>¥199,793.92</td>
+    </tr>
+    <tr>
+      <td>2026-01-21</td>
+      <td><span style="color:#94a3b8">2月合约(剩19交易日)</span><span class="roll-badge">换月</span></td>
+      <td>3.243</td><td>3.281</td>
+      <td><span class="tag p">认沽↓</span></td><td><span class="tag rev-c">✓反手</span></td><td></td>
+      <td class="neg">¥-86.78</td>
+      <td>¥199,707.14</td>
+    </tr>
+    <tr>
+      <td>2026-01-22</td>
+      <td><span style="color:#94a3b8">2月合约(剩18交易日)</span></td>
+      <td>3.298</td><td>3.315</td>
+      <td><span class="tag c">认购↑</span></td><td><span class="tag rev-c">✓反手</span></td><td></td>
+      <td class="neg">¥-295.02</td>
+      <td>¥199,412.12</td>
+    </tr>
+    <tr>
+      <td>2026-01-23</td>
+      <td><span style="color:#94a3b8">2月合约(剩17交易日)</span></td>
+      <td>3.322</td><td>3.337</td>
+      <td><span class="tag n">观望</span></td><td></td><td></td>
+      <td class="neu">¥0.00</td>
+      <td>¥199,412.12</td>
+    </tr>
+    <tr>
+      <td>2026-01-26</td>
+      <td><span style="color:#94a3b8">2月合约(剩16交易日)</span></td>
+      <td>3.352</td><td>3.305</td>
+      <td><span class="tag n">观望</span></td><td></td><td></td>
+      <td class="neu">¥0.00</td>
+      <td>¥199,412.12</td>
+    </tr>
+    <tr>
+      <td>2026-01-27</td>
+      <td><span style="color:#94a3b8">2月合约(剩15交易日)</span></td>
+      <td>3.310</td><td>3.327</td>
+      <td><span class="tag n">观望</span></td><td></td><td></td>
+      <td class="neu">¥0.00</td>
+      <td>¥199,412.12</td>
+    </tr>
+    <tr>
+      <td>2026-01-28</td>
+      <td><span style="color:#94a3b8">2月合约(剩14交易日)</span></td>
+      <td>3.342</td><td>3.307</td>
+      <td><span class="tag n">观望</span></td><td></td><td></td>
+      <td class="neu">¥0.00</td>
+      <td>¥199,412.12</td>
+    </tr>
+    <tr>
+      <td>2026-01-29</td>
+      <td><span style="color:#94a3b8">2月合约(剩13交易日)</span></td>
+      <td>3.297</td><td>3.292</td>
+      <td><span class="tag n">观望</span></td><td></td><td></td>
+      <td class="neu">¥0.00</td>
+      <td>¥199,412.12</td>
+    </tr>
+    <tr>
+      <td>2026-01-30</td>
+      <td><span style="color:#94a3b8">2月合约(剩12交易日)</span></td>
+      <td>3.286</td><td>3.335</td>
+      <td><span class="tag n">观望</span></td><td></td><td></td>
+      <td class="neu">¥0.00</td>
+      <td>¥199,412.12</td>
+    </tr>
+    <tr>
+      <td>2026-02-02</td>
+      <td><span style="color:#94a3b8">2月合约(剩11交易日)</span></td>
+      <td>3.338</td><td>3.252</td>
+      <td><span class="tag n">观望</span></td><td></td><td></td>
+      <td class="neu">¥0.00</td>
+      <td>¥199,412.12</td>
+    </tr>
+    <tr>
+      <td>2026-02-03</td>
+      <td><span style="color:#94a3b8">2月合约(剩10交易日)</span></td>
+      <td>3.302</td><td>3.313</td>
+      <td><span class="tag c">认购↑</span></td><td></td><td><span class="tag hdg">✓对冲</span></td>
+      <td class="pos">¥76.69</td>
+      <td>¥199,488.81</td>
+    </tr>
+    <tr>
+      <td>2026-02-04</td>
+      <td><span style="color:#94a3b8">2月合约(剩9交易日)</span></td>
+      <td>3.290</td><td>3.297</td>
+      <td><span class="tag p">认沽↓</span></td><td><span class="tag rev-c">✓反手</span></td><td><span class="tag hdg">✓对冲</span></td>
+      <td class="neg">¥-16.55</td>
+      <td>¥199,472.26</td>
+    </tr>
+    <tr>
+      <td>2026-02-05</td>
+      <td><span style="color:#94a3b8">2月合约(剩8交易日)</span></td>
+      <td>3.264</td><td>3.238</td>
+      <td><span class="tag p">认沽↓</span></td><td></td><td><span class="tag hdg">✓对冲</span></td>
+      <td class="pos">¥75.23</td>
+      <td>¥199,547.49</td>
+    </tr>
+    <tr>
+      <td>2026-02-06</td>
+      <td><span style="color:#94a3b8">2月合约(剩7交易日)</span></td>
+      <td>3.210</td><td>3.229</td>
+      <td><span class="tag p">认沽↓</span></td><td><span class="tag rev-c">✓反手</span></td><td><span class="tag hdg">✓对冲</span></td>
+      <td class="neg">¥-172.93</td>
+      <td>¥199,374.56</td>
+    </tr>
+    <tr>
+      <td>2026-02-09</td>
+      <td><span style="color:#94a3b8">2月合约(剩6交易日)</span></td>
+      <td>3.288</td><td>3.321</td>
+      <td><span class="tag c">认购↑</span></td><td></td><td><span class="tag hdg">✓对冲</span></td>
+      <td class="pos">¥137.53</td>
+      <td>¥199,512.09</td>
+    </tr>
+    <tr>
+      <td>2026-02-10</td>
+      <td><span style="color:#94a3b8">3月合约(剩25交易日)</span><span class="roll-badge">换月</span></td>
+      <td>3.327</td><td>3.311</td>
+      <td><span class="tag n">观望</span></td><td></td><td></td>
+      <td class="neu">¥0.00</td>
+      <td>¥199,512.09</td>
+    </tr>
+    <tr>
+      <td>2026-02-11</td>
+      <td><span style="color:#94a3b8">3月合约(剩24交易日)</span></td>
+      <td>3.300</td><td>3.273</td>
+      <td><span class="tag n">观望</span></td><td></td><td></td>
+      <td class="neu">¥0.00</td>
+      <td>¥199,512.09</td>
+    </tr>
+    <tr>
+      <td>2026-02-12</td>
+      <td><span style="color:#94a3b8">3月合约(剩23交易日)</span></td>
+      <td>3.280</td><td>3.319</td>
+      <td><span class="tag n">观望</span></td><td></td><td></td>
+      <td class="neu">¥0.00</td>
+      <td>¥199,512.09</td>
+    </tr>
+    <tr>
+      <td>2026-02-13</td>
+      <td><span style="color:#94a3b8">3月合约(剩22交易日)</span></td>
+      <td>3.303</td><td>3.265</td>
+      <td><span class="tag n">观望</span></td><td></td><td></td>
+      <td class="neu">¥0.00</td>
+      <td>¥199,512.09</td>
+    </tr>
+    <tr>
+      <td>2026-02-24</td>
+      <td><span style="color:#94a3b8">3月合约(剩21交易日)</span></td>
+      <td>3.318</td><td>3.295</td>
+      <td><span class="tag c">认购↑</span></td><td><span class="tag rev-c">✓反手</span></td><td></td>
+      <td class="neg">¥-193.53</td>
+      <td>¥199,318.56</td>
+    </tr>
+    <tr>
+      <td>2026-02-25</td>
+      <td><span style="color:#94a3b8">3月合约(剩20交易日)</span></td>
+      <td>3.301</td><td>3.344</td>
+      <td><span class="tag n">观望</span></td><td></td><td></td>
+      <td class="neu">¥0.00</td>
+      <td>¥199,318.56</td>
+    </tr>
+    <tr>
+      <td>2026-02-26</td>
+      <td><span style="color:#94a3b8">3月合约(剩19交易日)</span></td>
+      <td>3.338</td><td>3.336</td>
+      <td><span class="tag n">观望</span></td><td></td><td></td>
+      <td class="neu">¥0.00</td>
+      <td>¥199,318.56</td>
+    </tr>
+    <tr>
+      <td>2026-02-27</td>
+      <td><span style="color:#94a3b8">3月合约(剩18交易日)</span></td>
+      <td>3.310</td><td>3.301</td>
+      <td><span class="tag p">认沽↓</span></td><td></td><td></td>
+      <td class="pos">¥33.10</td>
+      <td>¥199,351.66</td>
+    </tr>
+    <tr>
+      <td>2026-03-02</td>
+      <td><span style="color:#94a3b8">3月合约(剩17交易日)</span></td>
+      <td>3.251</td><td>3.282</td>
+      <td><span class="tag p">认沽↓</span></td><td><span class="tag rev-c">✓反手</span></td><td></td>
+      <td class="neg">¥-37.34</td>
+      <td>¥199,314.32</td>
+    </tr>
+    <tr>
+      <td>2026-03-03</td>
+      <td><span style="color:#94a3b8">3月合约(剩16交易日)</span></td>
+      <td>3.303</td><td>3.205</td>
+      <td><span class="tag c">认购↑</span></td><td><span class="tag rev-c">✓反手</span></td><td><span class="tag hdg">✓对冲</span></td>
+      <td class="pos">¥129.89</td>
+      <td>¥199,444.21</td>
+    </tr>
+    <tr>
+      <td>2026-03-04</td>
+      <td><span style="color:#94a3b8">3月合约(剩15交易日)</span></td>
+      <td>3.170</td><td>3.154</td>
+      <td><span class="tag p">认沽↓</span></td><td></td><td><span class="tag hdg">✓对冲</span></td>
+      <td class="pos">¥71.21</td>
+      <td>¥199,515.42</td>
+    </tr>
+    <tr>
+      <td>2026-03-05</td>
+      <td><span style="color:#94a3b8">3月合约(剩14交易日)</span></td>
+      <td>3.216</td><td>3.206</td>
+      <td><span class="tag c">认购↑</span></td><td><span class="tag rev-c">✓反手</span></td><td></td>
+      <td class="neg">¥-176.98</td>
+      <td>¥199,338.44</td>
+    </tr>
+    <tr>
+      <td>2026-03-06</td>
+      <td><span style="color:#94a3b8">3月合约(剩13交易日)</span></td>
+      <td>3.191</td><td>3.225</td>
+      <td><span class="tag n">观望</span></td><td></td><td></td>
+      <td class="neu">¥0.00</td>
+      <td>¥199,338.44</td>
+    </tr>
+    <tr>
+      <td>2026-03-09</td>
+      <td><span style="color:#94a3b8">3月合约(剩12交易日)</span></td>
+      <td>3.183</td><td>3.201</td>
+      <td><span class="tag p">认沽↓</span></td><td></td><td><span class="tag hdg">✓对冲</span></td>
+      <td class="pos">¥50.01</td>
+      <td>¥199,388.45</td>
+    </tr>
+    <tr>
+      <td>2026-03-10</td>
+      <td><span style="color:#94a3b8">3月合约(剩11交易日)</span></td>
+      <td>3.267</td><td>3.296</td>
+      <td><span class="tag c">认购↑</span></td><td></td><td><span class="tag hdg">✓对冲</span></td>
+      <td class="pos">¥108.75</td>
+      <td>¥199,497.20</td>
+    </tr>
+    <tr>
+      <td>2026-03-11</td>
+      <td><span style="color:#94a3b8">3月合约(剩10交易日)</span></td>
+      <td>3.303</td><td>3.335</td>
+      <td><span class="tag n">观望</span></td><td></td><td></td>
+      <td class="neu">¥0.00</td>
+      <td>¥199,497.20</td>
+    </tr>
+    <tr>
+      <td>2026-03-12</td>
+      <td><span style="color:#94a3b8">3月合约(剩9交易日)</span></td>
+      <td>3.340</td><td>3.308</td>
+      <td><span class="tag n">观望</span></td><td></td><td></td>
+      <td class="neu">¥0.00</td>
+      <td>¥199,497.20</td>
+    </tr>
+    <tr>
+      <td>2026-03-13</td>
+      <td><span style="color:#94a3b8">3月合约(剩8交易日)</span></td>
+      <td>3.290</td><td>3.300</td>
+      <td><span class="tag p">认沽↓</span></td><td><span class="tag rev-c">✓反手</span></td><td></td>
+      <td class="neg">¥-263.42</td>
+      <td>¥199,233.78</td>
+    </tr>
+    <tr>
+      <td>2026-03-16</td>
+      <td><span style="color:#94a3b8">3月合约(剩7交易日)</span></td>
+      <td>3.308</td><td>3.349</td>
+      <td><span class="tag n">观望</span></td><td></td><td></td>
+      <td class="neu">¥0.00</td>
+      <td>¥199,233.78</td>
+    </tr>
+    <tr>
+      <td>2026-03-17</td>
+      <td><span style="color:#94a3b8">3月合约(剩6交易日)</span></td>
+      <td>3.369</td><td>3.273</td>
+      <td><span class="tag c">认购↑</span></td><td><span class="tag rev-c">✓反手</span></td><td><span class="tag hdg">✓对冲</span></td>
+      <td class="neg">¥-40.51</td>
+      <td>¥199,193.27</td>
+    </tr>
+    <tr>
+      <td>2026-03-18</td>
+      <td><span style="color:#94a3b8">4月合约(剩8交易日)</span><span class="roll-badge">换月</span></td>
+      <td>3.293</td><td>3.338</td>
+      <td><span class="tag c">认购↑</span></td><td></td><td><span class="tag hdg">✓对冲</span></td>
+      <td class="pos">¥211.87</td>
+      <td>¥199,405.14</td>
+    </tr>
+    <tr>
+      <td>2026-03-19</td>
+      <td><span style="color:#94a3b8">4月合约(剩7交易日)</span></td>
+      <td>3.297</td><td>3.303</td>
+      <td><span class="tag p">认沽↓</span></td><td></td><td></td>
+      <td class="neg">¥-39.21</td>
+      <td>¥199,365.93</td>
+    </tr>
+    <tr>
+      <td>2026-03-20</td>
+      <td><span style="color:#94a3b8">4月合约(剩6交易日)</span></td>
+      <td>3.337</td><td>3.341</td>
+      <td><span class="tag c">认购↑</span></td><td></td><td><span class="tag hdg">✓对冲</span></td>
+      <td class="pos">¥89.63</td>
+      <td>¥199,455.56</td>
+    </tr>
+    <tr>
+      <td>2026-03-23</td>
+      <td><span style="color:#94a3b8">4月合约(剩5交易日)</span></td>
+      <td>3.300</td><td>3.228</td>
+      <td><span class="tag p">认沽↓</span></td><td></td><td><span class="tag hdg">✓对冲</span></td>
+      <td class="pos">¥223.14</td>
+      <td>¥199,678.70</td>
+    </tr>
+    <tr>
+      <td>2026-03-24</td>
+      <td><span style="color:#94a3b8">4月合约(剩4交易日)</span></td>
+      <td>3.275</td><td>3.237</td>
+      <td><span class="tag c">认购↑</span></td><td><span class="tag rev-c">✓反手</span></td><td><span class="tag hdg">✓对冲</span></td>
+      <td class="pos">¥62.58</td>
+      <td>¥199,741.28</td>
+    </tr>
+    <tr>
+      <td>2026-03-25</td>
+      <td><span style="color:#94a3b8">4月合约(剩3交易日)</span></td>
+      <td>3.279</td><td>3.307</td>
+      <td><span class="tag c">认购↑</span></td><td></td><td><span class="tag hdg">✓对冲</span></td>
+      <td class="pos">¥140.18</td>
+      <td>¥199,881.46</td>
+    </tr>
+    <tr>
+      <td>2026-03-26</td>
+      <td><span style="color:#94a3b8">4月合约(剩2交易日)</span></td>
+      <td>3.306</td><td>3.263</td>
+      <td><span class="tag n">观望</span></td><td></td><td></td>
+      <td class="neu">¥0.00</td>
+      <td>¥199,881.46</td>
+    </tr>
+    <tr>
+      <td>2026-03-27</td>
+      <td><span style="color:#94a3b8">4月合约(剩1交易日)</span></td>
+      <td>3.241</td><td>3.293</td>
+      <td><span class="tag p">认沽↓</span></td><td><span class="tag rev-c">✓反手</span></td><td><span class="tag hdg">✓对冲</span></td>
+      <td class="pos">¥43.06</td>
+      <td>¥199,924.52</td>
+    </tr>
+    <tr>
+      <td>2026-03-30</td>
+      <td><span style="color:#94a3b8">4月合约(剩0交易日)</span></td>
+      <td>3.242</td><td>3.264</td>
+      <td><span class="tag p">认沽↓</span></td><td></td><td></td>
+      <td class="neg">¥-118.34</td>
+      <td>¥199,806.18</td>
+    </tr></tbody></table></div>
+<div class="st">月度绩效</div>
+<div class="tw"><table>
+  <thead><tr>
+    <th>月份</th><th>交易日</th><th>月盈亏</th><th>胜率</th>
+    <th>最大盈利/天</th><th>最大亏损/天</th><th>反手次数</th><th>对冲次数</th><th>月末净值</th>
+  </tr></thead><tbody>
+<tr>
+      <td>2026-01</td><td>19</td>
+      <td class="neg">¥-587.88</td>
+      <td>10.5%</td>
+      <td class="pos">¥64.70</td>
+      <td class="neg">¥-295.02</td>
+      <td>5</td><td>3</td>
+      <td>¥199,412.12</td>
+    </tr><tr>
+      <td>2026-02</td><td>14</td>
+      <td class="neg">¥-60.46</td>
+      <td>28.6%</td>
+      <td class="pos">¥137.53</td>
+      <td class="neg">¥-193.53</td>
+      <td>3</td><td>5</td>
+      <td>¥199,351.66</td>
+    </tr><tr>
+      <td>2026-03</td><td>21</td>
+      <td class="pos">¥454.52</td>
+      <td>47.6%</td>
+      <td class="pos">¥223.14</td>
+      <td class="neg">¥-263.42</td>
+      <td>7</td><td>11</td>
+      <td>¥199,806.18</td>
+    </tr></tbody></table></div>
+<div class="st">完整交易记录</div>
+<div class="tw"><table>
+  <thead><tr>
+    <th>日期</th><th>时间</th><th>动作</th><th>期权名称</th>
+    <th>方向</th><th>行权价</th><th>到期日</th>
+    <th>权利金</th><th>合约价值</th><th>盈亏</th><th>原因</th>
+  </tr></thead><tbody>
+<tr>
+      <td>2026-01-08</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认1月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-01-28</td>
+      <td>0.1483</td>
+      <td>¥1,483</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↓-0.60%</td>
+    </tr><tr>
+      <td>2026-01-08</td><td>13:00</td>
+      <td><span class="tag hdg">卖出对冲</span></td>
+      <td style="white-space:nowrap">创业板ETF认1月3150</td>
+      <td>short</td>
+      <td>3.1</td>
+      <td style="color:#64748b;font-size:11px">2026-01-28</td>
+      <td>0.0861</td>
+      <td>¥861</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">浮盈7.0%→对冲</td>
+    </tr><tr>
+      <td>2026-01-08</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认1月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-01-28</td>
+      <td>0.1497</td>
+      <td>¥1,497</td>
+      <td class="pos">¥8.63</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-01-08</td><td>14:45</td>
+      <td><span class="tag clr">买入平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认1月3150</td>
+      <td>short</td>
+      <td>3.1</td>
+      <td style="color:#64748b;font-size:11px">2026-01-28</td>
+      <td>0.0800</td>
+      <td>¥800</td>
+      <td class="pos">¥56.07</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-01-09</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认1月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-01-28</td>
+      <td>0.1295</td>
+      <td>¥1,295</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↓-0.55%</td>
+    </tr><tr>
+      <td>2026-01-09</td><td>10:00</td>
+      <td><span class="tag rev-c">反手平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认1月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-01-28</td>
+      <td>0.1195</td>
+      <td>¥1,195</td>
+      <td class="neg">¥-105.41</td>
+      <td style="color:#64748b;font-size:11px">偏离0.67%反手</td>
+    </tr><tr>
+      <td>2026-01-09</td><td>10:00</td>
+      <td><span class="tag rev-o">反手开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认1月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-01-28</td>
+      <td>0.1544</td>
+      <td>¥1,544</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">反手→认购</td>
+    </tr><tr>
+      <td>2026-01-09</td><td>14:30</td>
+      <td><span class="tag hdg">卖出对冲</span></td>
+      <td style="white-space:nowrap">创业板ETF认1月3400</td>
+      <td>short</td>
+      <td>3.4</td>
+      <td style="color:#64748b;font-size:11px">2026-01-28</td>
+      <td>0.1203</td>
+      <td>¥1,203</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">浮盈5.2%→对冲</td>
+    </tr><tr>
+      <td>2026-01-09</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认1月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-01-28</td>
+      <td>0.1656</td>
+      <td>¥1,656</td>
+      <td class="pos">¥107.01</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-01-09</td><td>14:45</td>
+      <td><span class="tag clr">买入平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认1月3400</td>
+      <td>short</td>
+      <td>3.4</td>
+      <td style="color:#64748b;font-size:11px">2026-01-28</td>
+      <td>0.1229</td>
+      <td>¥1,229</td>
+      <td class="neg">¥-31.20</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-01-15</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认1月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-01-28</td>
+      <td>0.1175</td>
+      <td>¥1,175</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↓-0.78%</td>
+    </tr><tr>
+      <td>2026-01-15</td><td>11:30</td>
+      <td><span class="tag rev-c">反手平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认1月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-01-28</td>
+      <td>0.0984</td>
+      <td>¥984</td>
+      <td class="neg">¥-195.71</td>
+      <td style="color:#64748b;font-size:11px">偏离1.24%反手</td>
+    </tr><tr>
+      <td>2026-01-15</td><td>11:30</td>
+      <td><span class="tag rev-o">反手开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认1月3350</td>
+      <td>long</td>
+      <td>3.4</td>
+      <td style="color:#64748b;font-size:11px">2026-01-28</td>
+      <td>0.1362</td>
+      <td>¥1,362</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">反手→认购</td>
+    </tr><tr>
+      <td>2026-01-15</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认1月3350</td>
+      <td>long</td>
+      <td>3.4</td>
+      <td style="color:#64748b;font-size:11px">2026-01-28</td>
+      <td>0.1382</td>
+      <td>¥1,382</td>
+      <td class="pos">¥14.73</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-01-16</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认1月3400</td>
+      <td>long</td>
+      <td>3.4</td>
+      <td style="color:#64748b;font-size:11px">2026-01-28</td>
+      <td>0.1267</td>
+      <td>¥1,267</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↑0.89%</td>
+    </tr><tr>
+      <td>2026-01-16</td><td>11:00</td>
+      <td><span class="tag rev-c">反手平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认1月3400</td>
+      <td>long</td>
+      <td>3.4</td>
+      <td style="color:#64748b;font-size:11px">2026-01-28</td>
+      <td>0.1127</td>
+      <td>¥1,127</td>
+      <td class="neg">¥-144.66</td>
+      <td style="color:#64748b;font-size:11px">偏离-0.86%反手</td>
+    </tr><tr>
+      <td>2026-01-16</td><td>11:00</td>
+      <td><span class="tag rev-o">反手开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认1月3350</td>
+      <td>long</td>
+      <td>3.4</td>
+      <td style="color:#64748b;font-size:11px">2026-01-28</td>
+      <td>0.1166</td>
+      <td>¥1,166</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">反手→认沽</td>
+    </tr><tr>
+      <td>2026-01-16</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认1月3350</td>
+      <td>long</td>
+      <td>3.4</td>
+      <td style="color:#64748b;font-size:11px">2026-01-28</td>
+      <td>0.1193</td>
+      <td>¥1,193</td>
+      <td class="pos">¥22.86</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-01-19</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认1月3350</td>
+      <td>long</td>
+      <td>3.4</td>
+      <td style="color:#64748b;font-size:11px">2026-01-28</td>
+      <td>0.1168</td>
+      <td>¥1,168</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↓-0.57%</td>
+    </tr><tr>
+      <td>2026-01-19</td><td>10:00</td>
+      <td><span class="tag hdg">卖出对冲</span></td>
+      <td style="white-space:nowrap">创业板ETF认1月3200</td>
+      <td>short</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-01-28</td>
+      <td>0.0554</td>
+      <td>¥554</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">浮盈7.8%→对冲</td>
+    </tr><tr>
+      <td>2026-01-19</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认1月3350</td>
+      <td>long</td>
+      <td>3.4</td>
+      <td style="color:#64748b;font-size:11px">2026-01-28</td>
+      <td>0.1206</td>
+      <td>¥1,206</td>
+      <td class="pos">¥32.74</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-01-19</td><td>14:45</td>
+      <td><span class="tag clr">买入平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认1月3200</td>
+      <td>short</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-01-28</td>
+      <td>0.0520</td>
+      <td>¥520</td>
+      <td class="pos">¥28.86</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-01-21</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.1821</td>
+      <td>¥1,821</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↓-0.61%</td>
+    </tr><tr>
+      <td>2026-01-21</td><td>11:30</td>
+      <td><span class="tag rev-c">反手平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.1688</td>
+      <td>¥1,688</td>
+      <td class="neg">¥-137.30</td>
+      <td style="color:#64748b;font-size:11px">偏离0.83%反手</td>
+    </tr><tr>
+      <td>2026-01-21</td><td>11:30</td>
+      <td><span class="tag rev-o">反手开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.2120</td>
+      <td>¥2,120</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">反手→认购</td>
+    </tr><tr>
+      <td>2026-01-21</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.2176</td>
+      <td>¥2,176</td>
+      <td class="pos">¥50.52</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-01-22</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.2015</td>
+      <td>¥2,015</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↑0.52%</td>
+    </tr><tr>
+      <td>2026-01-22</td><td>10:30</td>
+      <td><span class="tag rev-c">反手平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.1915</td>
+      <td>¥1,915</td>
+      <td class="neg">¥-105.06</td>
+      <td style="color:#64748b;font-size:11px">偏离-0.60%反手</td>
+    </tr><tr>
+      <td>2026-01-22</td><td>10:30</td>
+      <td><span class="tag rev-o">反手开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.1900</td>
+      <td>¥1,900</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">反手→认沽</td>
+    </tr><tr>
+      <td>2026-01-22</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.1715</td>
+      <td>¥1,715</td>
+      <td class="neg">¥-189.96</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-02-03</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.1701</td>
+      <td>¥1,701</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↑1.54%</td>
+    </tr><tr>
+      <td>2026-02-03</td><td>10:00</td>
+      <td><span class="tag hdg">卖出对冲</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3400</td>
+      <td>short</td>
+      <td>3.4</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.1362</td>
+      <td>¥1,362</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">浮盈5.5%→对冲</td>
+    </tr><tr>
+      <td>2026-02-03</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.1751</td>
+      <td>¥1,751</td>
+      <td class="pos">¥44.93</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-02-03</td><td>14:45</td>
+      <td><span class="tag clr">买入平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3400</td>
+      <td>short</td>
+      <td>3.4</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.1326</td>
+      <td>¥1,326</td>
+      <td class="pos">¥31.76</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-02-04</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.1517</td>
+      <td>¥1,517</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↓-0.69%</td>
+    </tr><tr>
+      <td>2026-02-04</td><td>10:00</td>
+      <td><span class="tag hdg">卖出对冲</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3150</td>
+      <td>short</td>
+      <td>3.1</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.0933</td>
+      <td>¥933</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">浮盈10.7%→对冲</td>
+    </tr><tr>
+      <td>2026-02-04</td><td>11:00</td>
+      <td><span class="tag rev-c">反手平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.1432</td>
+      <td>¥1,432</td>
+      <td class="neg">¥-90.66</td>
+      <td style="color:#64748b;font-size:11px">偏离0.52%反手</td>
+    </tr><tr>
+      <td>2026-02-04</td><td>11:00</td>
+      <td><span class="tag rev-o">反手开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.1693</td>
+      <td>¥1,693</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">反手→认购</td>
+    </tr><tr>
+      <td>2026-02-04</td><td>14:45</td>
+      <td><span class="tag clr">买入平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3150</td>
+      <td>short</td>
+      <td>3.1</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.0792</td>
+      <td>¥792</td>
+      <td class="pos">¥135.45</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-02-04</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.1636</td>
+      <td>¥1,636</td>
+      <td class="neg">¥-61.34</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-02-05</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.1349</td>
+      <td>¥1,349</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↓-1.00%</td>
+    </tr><tr>
+      <td>2026-02-05</td><td>10:30</td>
+      <td><span class="tag hdg">卖出对冲</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3150</td>
+      <td>short</td>
+      <td>3.1</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.0942</td>
+      <td>¥942</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">浮盈5.5%→对冲</td>
+    </tr><tr>
+      <td>2026-02-05</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.1470</td>
+      <td>¥1,470</td>
+      <td class="pos">¥116.14</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-02-05</td><td>14:45</td>
+      <td><span class="tag clr">买入平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3150</td>
+      <td>short</td>
+      <td>3.1</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.0978</td>
+      <td>¥978</td>
+      <td class="neg">¥-40.91</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-02-06</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3200</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.1317</td>
+      <td>¥1,317</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↓-0.86%</td>
+    </tr><tr>
+      <td>2026-02-06</td><td>10:00</td>
+      <td><span class="tag hdg">卖出对冲</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3100</td>
+      <td>short</td>
+      <td>3.1</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.0923</td>
+      <td>¥923</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">浮盈7.0%→对冲</td>
+    </tr><tr>
+      <td>2026-02-06</td><td>13:00</td>
+      <td><span class="tag rev-c">反手平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3200</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.1127</td>
+      <td>¥1,127</td>
+      <td class="neg">¥-195.19</td>
+      <td style="color:#64748b;font-size:11px">偏离1.27%反手</td>
+    </tr><tr>
+      <td>2026-02-06</td><td>13:00</td>
+      <td><span class="tag rev-o">反手开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.1566</td>
+      <td>¥1,566</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">反手→认购</td>
+    </tr><tr>
+      <td>2026-02-06</td><td>14:45</td>
+      <td><span class="tag clr">买入平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3100</td>
+      <td>short</td>
+      <td>3.1</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.0780</td>
+      <td>¥780</td>
+      <td class="pos">¥138.12</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-02-06</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.1455</td>
+      <td>¥1,455</td>
+      <td class="neg">¥-115.86</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-02-09</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.1422</td>
+      <td>¥1,422</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↑1.83%</td>
+    </tr><tr>
+      <td>2026-02-09</td><td>11:00</td>
+      <td><span class="tag hdg">卖出对冲</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3400</td>
+      <td>short</td>
+      <td>3.4</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.1135</td>
+      <td>¥1,135</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">浮盈10.0%→对冲</td>
+    </tr><tr>
+      <td>2026-02-09</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.1583</td>
+      <td>¥1,583</td>
+      <td class="pos">¥156.32</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-02-09</td><td>14:45</td>
+      <td><span class="tag clr">买入平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认2月3400</td>
+      <td>short</td>
+      <td>3.4</td>
+      <td style="color:#64748b;font-size:11px">2026-02-25</td>
+      <td>0.1149</td>
+      <td>¥1,149</td>
+      <td class="neg">¥-18.79</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-02-24</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1989</td>
+      <td>¥1,989</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↑1.62%</td>
+    </tr><tr>
+      <td>2026-02-24</td><td>10:30</td>
+      <td><span class="tag rev-c">反手平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1840</td>
+      <td>¥1,840</td>
+      <td class="neg">¥-154.79</td>
+      <td style="color:#64748b;font-size:11px">偏离-0.87%反手</td>
+    </tr><tr>
+      <td>2026-02-24</td><td>10:30</td>
+      <td><span class="tag rev-o">反手开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1731</td>
+      <td>¥1,731</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">反手→认沽</td>
+    </tr><tr>
+      <td>2026-02-24</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1697</td>
+      <td>¥1,697</td>
+      <td class="neg">¥-38.74</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-02-27</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1555</td>
+      <td>¥1,555</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↓-0.78%</td>
+    </tr><tr>
+      <td>2026-02-27</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1593</td>
+      <td>¥1,593</td>
+      <td class="pos">¥33.10</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-02</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1496</td>
+      <td>¥1,496</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↓-1.51%</td>
+    </tr><tr>
+      <td>2026-03-02</td><td>13:30</td>
+      <td><span class="tag rev-c">反手平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1403</td>
+      <td>¥1,403</td>
+      <td class="neg">¥-98.01</td>
+      <td style="color:#64748b;font-size:11px">偏离0.57%反手</td>
+    </tr><tr>
+      <td>2026-03-02</td><td>13:30</td>
+      <td><span class="tag rev-o">反手开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1792</td>
+      <td>¥1,792</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">反手→认购</td>
+    </tr><tr>
+      <td>2026-03-02</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1858</td>
+      <td>¥1,858</td>
+      <td class="pos">¥60.67</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-03</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1706</td>
+      <td>¥1,706</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↑0.64%</td>
+    </tr><tr>
+      <td>2026-03-03</td><td>10:30</td>
+      <td><span class="tag rev-c">反手平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1520</td>
+      <td>¥1,520</td>
+      <td class="neg">¥-191.39</td>
+      <td style="color:#64748b;font-size:11px">偏离-1.13%反手</td>
+    </tr><tr>
+      <td>2026-03-03</td><td>10:30</td>
+      <td><span class="tag rev-o">反手开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1397</td>
+      <td>¥1,397</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">反手→认沽</td>
+    </tr><tr>
+      <td>2026-03-03</td><td>13:00</td>
+      <td><span class="tag hdg">卖出对冲</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3100</td>
+      <td>short</td>
+      <td>3.1</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.0974</td>
+      <td>¥974</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">浮盈24.6%→对冲</td>
+    </tr><tr>
+      <td>2026-03-03</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1699</td>
+      <td>¥1,700</td>
+      <td class="pos">¥297.87</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-03</td><td>14:45</td>
+      <td><span class="tag clr">买入平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3100</td>
+      <td>short</td>
+      <td>3.1</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.0945</td>
+      <td>¥945</td>
+      <td class="pos">¥23.41</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-04</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3150</td>
+      <td>long</td>
+      <td>3.1</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1305</td>
+      <td>¥1,305</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↓-1.09%</td>
+    </tr><tr>
+      <td>2026-03-04</td><td>13:30</td>
+      <td><span class="tag hdg">卖出对冲</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3050</td>
+      <td>short</td>
+      <td>3.0</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.0913</td>
+      <td>¥913</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">浮盈6.5%→对冲</td>
+    </tr><tr>
+      <td>2026-03-04</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3150</td>
+      <td>long</td>
+      <td>3.1</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1375</td>
+      <td>¥1,375</td>
+      <td class="pos">¥65.43</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-04</td><td>14:45</td>
+      <td><span class="tag clr">买入平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3050</td>
+      <td>short</td>
+      <td>3.0</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.0902</td>
+      <td>¥902</td>
+      <td class="pos">¥5.78</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-05</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3200</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1659</td>
+      <td>¥1,659</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↑1.97%</td>
+    </tr><tr>
+      <td>2026-03-05</td><td>10:30</td>
+      <td><span class="tag rev-c">反手平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3200</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1551</td>
+      <td>¥1,551</td>
+      <td class="neg">¥-113.72</td>
+      <td style="color:#64748b;font-size:11px">偏离-0.65%反手</td>
+    </tr><tr>
+      <td>2026-03-05</td><td>10:30</td>
+      <td><span class="tag rev-o">反手开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3200</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1417</td>
+      <td>¥1,417</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">反手→认沽</td>
+    </tr><tr>
+      <td>2026-03-05</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3200</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1359</td>
+      <td>¥1,359</td>
+      <td class="neg">¥-63.26</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-09</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3200</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1357</td>
+      <td>¥1,357</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↓-1.30%</td>
+    </tr><tr>
+      <td>2026-03-09</td><td>10:00</td>
+      <td><span class="tag hdg">卖出对冲</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3050</td>
+      <td>short</td>
+      <td>3.0</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.0765</td>
+      <td>¥765</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">浮盈10.9%→对冲</td>
+    </tr><tr>
+      <td>2026-03-09</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3200</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1260</td>
+      <td>¥1,260</td>
+      <td class="neg">¥-102.62</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-09</td><td>14:45</td>
+      <td><span class="tag clr">买入平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3050</td>
+      <td>short</td>
+      <td>3.0</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.0608</td>
+      <td>¥608</td>
+      <td class="pos">¥152.63</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-10</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1510</td>
+      <td>¥1,510</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↑2.06%</td>
+    </tr><tr>
+      <td>2026-03-10</td><td>10:30</td>
+      <td><span class="tag hdg">卖出对冲</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3400</td>
+      <td>short</td>
+      <td>3.4</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.0976</td>
+      <td>¥976</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">浮盈6.8%→对冲</td>
+    </tr><tr>
+      <td>2026-03-10</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1659</td>
+      <td>¥1,659</td>
+      <td class="pos">¥144.30</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-10</td><td>14:45</td>
+      <td><span class="tag clr">买入平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3400</td>
+      <td>short</td>
+      <td>3.4</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1007</td>
+      <td>¥1,007</td>
+      <td class="neg">¥-35.55</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-13</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1215</td>
+      <td>¥1,215</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↓-0.54%</td>
+    </tr><tr>
+      <td>2026-03-13</td><td>10:00</td>
+      <td><span class="tag rev-c">反手平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1071</td>
+      <td>¥1,071</td>
+      <td class="neg">¥-148.70</td>
+      <td style="color:#64748b;font-size:11px">偏离0.89%反手</td>
+    </tr><tr>
+      <td>2026-03-13</td><td>10:00</td>
+      <td><span class="tag rev-o">反手开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1416</td>
+      <td>¥1,416</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">反手→认购</td>
+    </tr><tr>
+      <td>2026-03-13</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1307</td>
+      <td>¥1,307</td>
+      <td class="neg">¥-114.72</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-17</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3350</td>
+      <td>long</td>
+      <td>3.4</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1231</td>
+      <td>¥1,231</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↑0.60%</td>
+    </tr><tr>
+      <td>2026-03-17</td><td>11:00</td>
+      <td><span class="tag rev-c">反手平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3350</td>
+      <td>long</td>
+      <td>3.4</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1021</td>
+      <td>¥1,021</td>
+      <td class="neg">¥-214.99</td>
+      <td style="color:#64748b;font-size:11px">偏离-1.21%反手</td>
+    </tr><tr>
+      <td>2026-03-17</td><td>11:00</td>
+      <td><span class="tag rev-o">反手开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3350</td>
+      <td>long</td>
+      <td>3.4</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1110</td>
+      <td>¥1,110</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">反手→认沽</td>
+    </tr><tr>
+      <td>2026-03-17</td><td>13:30</td>
+      <td><span class="tag hdg">卖出对冲</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3200</td>
+      <td>short</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.0506</td>
+      <td>¥506</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">浮盈8.7%→对冲</td>
+    </tr><tr>
+      <td>2026-03-17</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3350</td>
+      <td>long</td>
+      <td>3.4</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.1418</td>
+      <td>¥1,418</td>
+      <td class="pos">¥303.14</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-17</td><td>14:45</td>
+      <td><span class="tag clr">买入平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认3月3200</td>
+      <td>short</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-03-25</td>
+      <td>0.0630</td>
+      <td>¥630</td>
+      <td class="neg">¥-128.66</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-18</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.2014</td>
+      <td>¥2,014</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↑0.61%</td>
+    </tr><tr>
+      <td>2026-03-18</td><td>10:00</td>
+      <td><span class="tag hdg">卖出对冲</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3450</td>
+      <td>short</td>
+      <td>3.5</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1602</td>
+      <td>¥1,602</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">浮盈10.8%→对冲</td>
+    </tr><tr>
+      <td>2026-03-18</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.2244</td>
+      <td>¥2,244</td>
+      <td class="pos">¥225.30</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-18</td><td>14:45</td>
+      <td><span class="tag clr">买入平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3450</td>
+      <td>short</td>
+      <td>3.5</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1611</td>
+      <td>¥1,611</td>
+      <td class="neg">¥-13.43</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-19</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1807</td>
+      <td>¥1,807</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↓-1.23%</td>
+    </tr><tr>
+      <td>2026-03-19</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1773</td>
+      <td>¥1,773</td>
+      <td class="neg">¥-39.21</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-20</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3350</td>
+      <td>long</td>
+      <td>3.4</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1965</td>
+      <td>¥1,965</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↑1.03%</td>
+    </tr><tr>
+      <td>2026-03-20</td><td>11:30</td>
+      <td><span class="tag hdg">卖出对冲</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3450</td>
+      <td>short</td>
+      <td>3.5</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1658</td>
+      <td>¥1,658</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">浮盈5.8%→对冲</td>
+    </tr><tr>
+      <td>2026-03-20</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3350</td>
+      <td>long</td>
+      <td>3.4</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1979</td>
+      <td>¥1,979</td>
+      <td class="pos">¥9.53</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-20</td><td>14:45</td>
+      <td><span class="tag clr">买入平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3450</td>
+      <td>short</td>
+      <td>3.5</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1573</td>
+      <td>¥1,573</td>
+      <td class="pos">¥80.10</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-23</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1701</td>
+      <td>¥1,701</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↓-1.23%</td>
+    </tr><tr>
+      <td>2026-03-23</td><td>10:00</td>
+      <td><span class="tag hdg">卖出对冲</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3150</td>
+      <td>short</td>
+      <td>3.1</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1127</td>
+      <td>¥1,127</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">浮盈10.7%→对冲</td>
+    </tr><tr>
+      <td>2026-03-23</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.2074</td>
+      <td>¥2,074</td>
+      <td class="pos">¥367.33</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-23</td><td>14:45</td>
+      <td><span class="tag clr">买入平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3150</td>
+      <td>short</td>
+      <td>3.1</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1266</td>
+      <td>¥1,266</td>
+      <td class="neg">¥-144.19</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-24</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1998</td>
+      <td>¥1,998</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↑1.46%</td>
+    </tr><tr>
+      <td>2026-03-24</td><td>10:30</td>
+      <td><span class="tag rev-c">反手平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1842</td>
+      <td>¥1,842</td>
+      <td class="neg">¥-161.12</td>
+      <td style="color:#64748b;font-size:11px">偏离-0.91%反手</td>
+    </tr><tr>
+      <td>2026-03-24</td><td>10:30</td>
+      <td><span class="tag rev-o">反手开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1675</td>
+      <td>¥1,675</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">反手→认沽</td>
+    </tr><tr>
+      <td>2026-03-24</td><td>11:00</td>
+      <td><span class="tag hdg">卖出对冲</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3100</td>
+      <td>short</td>
+      <td>3.1</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1189</td>
+      <td>¥1,189</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">浮盈18.4%→对冲</td>
+    </tr><tr>
+      <td>2026-03-24</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1712</td>
+      <td>¥1,712</td>
+      <td class="pos">¥31.61</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-24</td><td>14:45</td>
+      <td><span class="tag clr">买入平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3100</td>
+      <td>short</td>
+      <td>3.1</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.0992</td>
+      <td>¥992</td>
+      <td class="pos">¥192.09</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-25</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1763</td>
+      <td>¥1,763</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↑1.30%</td>
+    </tr><tr>
+      <td>2026-03-25</td><td>10:30</td>
+      <td><span class="tag hdg">卖出对冲</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3400</td>
+      <td>short</td>
+      <td>3.4</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1494</td>
+      <td>¥1,494</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">浮盈8.6%→对冲</td>
+    </tr><tr>
+      <td>2026-03-25</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3300</td>
+      <td>long</td>
+      <td>3.3</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1899</td>
+      <td>¥1,899</td>
+      <td class="pos">¥130.36</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-25</td><td>14:45</td>
+      <td><span class="tag clr">买入平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3400</td>
+      <td>short</td>
+      <td>3.4</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1480</td>
+      <td>¥1,480</td>
+      <td class="pos">¥9.82</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-27</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1624</td>
+      <td>¥1,624</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↓-0.67%</td>
+    </tr><tr>
+      <td>2026-03-27</td><td>10:30</td>
+      <td><span class="tag rev-c">反手平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1532</td>
+      <td>¥1,532</td>
+      <td class="neg">¥-96.50</td>
+      <td style="color:#64748b;font-size:11px">偏离0.57%反手</td>
+    </tr><tr>
+      <td>2026-03-27</td><td>10:30</td>
+      <td><span class="tag rev-o">反手开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1832</td>
+      <td>¥1,832</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">反手→认购</td>
+    </tr><tr>
+      <td>2026-03-27</td><td>11:30</td>
+      <td><span class="tag hdg">卖出对冲</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3400</td>
+      <td>short</td>
+      <td>3.4</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1338</td>
+      <td>¥1,338</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">浮盈7.7%→对冲</td>
+    </tr><tr>
+      <td>2026-03-27</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.2006</td>
+      <td>¥2,006</td>
+      <td class="pos">¥169.23</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-27</td><td>14:45</td>
+      <td><span class="tag clr">买入平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3400</td>
+      <td>short</td>
+      <td>3.4</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1363</td>
+      <td>¥1,363</td>
+      <td class="neg">¥-29.67</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr><tr>
+      <td>2026-03-30</td><td>09:30</td>
+      <td><span class="tag buy">买入开仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1540</td>
+      <td>¥1,540</td>
+      <td class="">—</td>
+      <td style="color:#64748b;font-size:11px">开盘↓-1.55%</td>
+    </tr><tr>
+      <td>2026-03-30</td><td>14:45</td>
+      <td><span class="tag clr">卖出平仓</span></td>
+      <td style="white-space:nowrap">创业板ETF认4月3250</td>
+      <td>long</td>
+      <td>3.2</td>
+      <td style="color:#64748b;font-size:11px">2026-04-22</td>
+      <td>0.1427</td>
+      <td>¥1,427</td>
+      <td class="neg">¥-118.34</td>
+      <td style="color:#64748b;font-size:11px">14:45强平</td>
+    </tr></tbody></table></div>
+<div class="footer">
+  创业板ETF(159915) 期权三阶段策略 v3（动态换月）| Black-76 实时重定价 | IV期限结构调整 |
+  数据：AKShare | 数据库：VeighNA SQLite | 策略参照：etf-option-strategy
+</div>
+
+<script>
+const gc='rgba(37,51,71,0.6)',tc='#64748b';
+const navDates=["2026-01-06", "2026-01-07", "2026-01-08", "2026-01-09", "2026-01-12", "2026-01-13", "2026-01-14", "2026-01-15", "2026-01-16", "2026-01-19", "2026-01-20", "2026-01-21", "2026-01-22", "2026-01-23", "2026-01-26", "2026-01-27", "2026-01-28", "2026-01-29", "2026-01-30", "2026-02-02", "2026-02-03", "2026-02-04", "2026-02-05", "2026-02-06", "2026-02-09", "2026-02-10", "2026-02-11", "2026-02-12", "2026-02-13", "2026-02-24", "2026-02-25", "2026-02-26", "2026-02-27", "2026-03-02", "2026-03-03", "2026-03-04", "2026-03-05", "2026-03-06", "2026-03-09", "2026-03-10", "2026-03-11", "2026-03-12", "2026-03-13", "2026-03-16", "2026-03-17", "2026-03-18", "2026-03-19", "2026-03-20", "2026-03-23", "2026-03-24", "2026-03-25", "2026-03-26", "2026-03-27", "2026-03-30"],navVals=[1.0, 1.0, 1.00032, 1.00018, 1.00018, 1.00018, 1.00018, 0.99927, 0.99866, 0.99897, 0.99897, 0.99854, 0.99706, 0.99706, 0.99706, 0.99706, 0.99706, 0.99706, 0.99706, 0.99706, 0.99745, 0.99736, 0.99774, 0.99687, 0.99756, 0.99756, 0.99756, 0.99756, 0.99756, 0.99659, 0.99659, 0.99659, 0.99676, 0.99657, 0.99722, 0.99758, 0.99669, 0.99669, 0.99694, 0.99749, 0.99749, 0.99749, 0.99617, 0.99617, 0.99597, 0.99703, 0.99683, 0.99728, 0.9984, 0.99871, 0.99941, 0.99941, 0.99962, 0.99903];
+const pnlVals=[0.0, 0.0, 64.7, -29.6, 0.0, 0.0, 0.0, -180.98, -121.8, 61.6, 0.0, -86.78, -295.02, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 76.69, -16.55, 75.23, -172.93, 137.53, 0.0, 0.0, 0.0, 0.0, -193.53, 0.0, 0.0, 33.1, -37.34, 129.89, 71.21, -176.98, 0.0, 50.01, 108.75, 0.0, 0.0, -263.42, 0.0, -40.51, 211.87, -39.21, 89.63, 223.14, 62.58, 140.18, 0.0, 43.06, -118.34],ddVals=[0.0, 0.0, 0.0, -0.0148, -0.0148, -0.0148, -0.0148, -0.10529, -0.16612, -0.13537, -0.13537, -0.17871, -0.32615, -0.32615, -0.32615, -0.32615, -0.32615, -0.32615, -0.32615, -0.32615, -0.28778, -0.29605, -0.25846, -0.34494, -0.27618, -0.27618, -0.27618, -0.27618, -0.27618, -0.37291, -0.37291, -0.37291, -0.35637, -0.37501, -0.31005, -0.27446, -0.36292, -0.36292, -0.33791, -0.28359, -0.28359, -0.28359, -0.41522, -0.41522, -0.43543, -0.3295, -0.34913, -0.30429, -0.19273, -0.16149, -0.0914, -0.0914, -0.06992, -0.12908];
+const etfD=["2026-01-05", "2026-01-06", "2026-01-07", "2026-01-08", "2026-01-09", "2026-01-12", "2026-01-13", "2026-01-14", "2026-01-15", "2026-01-16", "2026-01-19", "2026-01-20", "2026-01-21", "2026-01-22", "2026-01-23", "2026-01-26", "2026-01-27", "2026-01-28", "2026-01-29", "2026-01-30", "2026-02-02", "2026-02-03", "2026-02-04", "2026-02-05", "2026-02-06", "2026-02-09", "2026-02-10", "2026-02-11", "2026-02-12", "2026-02-13", "2026-02-24", "2026-02-25", "2026-02-26", "2026-02-27", "2026-03-02", "2026-03-03", "2026-03-04", "2026-03-05", "2026-03-06", "2026-03-09", "2026-03-10", "2026-03-11", "2026-03-12", "2026-03-13", "2026-03-16", "2026-03-17", "2026-03-18", "2026-03-19", "2026-03-20", "2026-03-23", "2026-03-24", "2026-03-25", "2026-03-26", "2026-03-27", "2026-03-30"],etfC=[3.281, 3.303, 3.311, 3.287, 3.314, 3.371, 3.306, 3.332, 3.352, 3.346, 3.318, 3.263, 3.281, 3.315, 3.337, 3.305, 3.327, 3.307, 3.292, 3.335, 3.252, 3.313, 3.297, 3.238, 3.229, 3.321, 3.311, 3.273, 3.319, 3.265, 3.295, 3.344, 3.336, 3.301, 3.282, 3.205, 3.154, 3.206, 3.225, 3.201, 3.296, 3.335, 3.308, 3.3, 3.349, 3.273, 3.338, 3.303, 3.341, 3.228, 3.237, 3.307, 3.263, 3.293, 3.264];
+const rollDays=["2026-01-21", "2026-02-10", "2026-03-18"];
+const mnthL=["2026-01", "2026-02", "2026-03"],mnthP=[-587.88, -60.46, 454.52],mnthW=[10.5, 28.6, 47.6];
+const revL=["10:00", "10:30", "11:00", "11:30", "13:00", "13:30"],revV=[2, 6, 3, 2, 1, 1],hdgL=["10:00", "10:30", "11:00", "11:30", "13:00", "13:30", "14:30"],hdgV=[7, 3, 2, 2, 2, 2, 1];
+
+const baseOpts=(extra={})=>Object.assign({
+  responsive:true,
+  plugins:{legend:{labels:{color:tc,boxWidth:10,font:{size:11}}}},
+  scales:{
+    x:{ticks:{color:tc,maxTicksLimit:8,font:{size:10}},grid:{color:gc}},
+    y:{ticks:{color:tc,font:{size:10}},grid:{color:gc}}
+  }
+},extra);
+
+// 换月垂直线 plugin
+const rollPlugin={
+  id:'rollLines',
+  afterDraw(chart){
+    rollDays.forEach(d=>{
+      const idx=navDates.indexOf(d);
+      if(idx<0)return;
+      const {ctx,chartArea,scales}=chart;
+      const x=scales.x.getPixelForValue(idx);
+      ctx.save();
+      ctx.strokeStyle='rgba(251,191,36,0.45)';
+      ctx.lineWidth=1.5;
+      ctx.setLineDash([4,3]);
+      ctx.beginPath();ctx.moveTo(x,chartArea.top);ctx.lineTo(x,chartArea.bottom);ctx.stroke();
+      ctx.fillStyle='#fbbf24';ctx.font='10px sans-serif';ctx.textAlign='center';
+      ctx.fillText('换月',x,chartArea.top+10);
+      ctx.restore();
+    });
+  }
+};
+
+new Chart(document.getElementById('navC'),{
+  type:'line',
+  data:{labels:navDates,datasets:[
+    {label:'策略净值',data:navVals,borderColor:'#60a5fa',
+     backgroundColor:'rgba(96,165,250,0.06)',borderWidth:2,pointRadius:0,fill:true,tension:0.2},
+    {label:'基准1.0',data:navDates.map(()=>1),borderColor:'#334155',
+     borderDash:[4,4],borderWidth:1,pointRadius:0}
+  ]},
+  options:baseOpts(),
+  plugins:[rollPlugin]
+});
+
+new Chart(document.getElementById('etfC'),{type:'line',data:{labels:etfD,datasets:[
+  {label:'159915',data:etfC,borderColor:'#a78bfa',
+   backgroundColor:'rgba(167,139,250,0.06)',borderWidth:2,pointRadius:0,fill:true,tension:0.2}
+]},options:baseOpts()});
+
+new Chart(document.getElementById('pnlC'),{type:'bar',data:{labels:navDates,datasets:[
+  {label:'日盈亏(¥)',data:pnlVals,
+   backgroundColor:pnlVals.map(v=>v>0?'rgba(52,211,153,0.7)':'rgba(248,113,113,0.7)'),
+   borderColor:pnlVals.map(v=>v>0?'#34d399':'#f87171'),borderWidth:1}
+]},options:baseOpts({plugins:{legend:{display:false}}})});
+
+new Chart(document.getElementById('ddC'),{type:'line',data:{labels:navDates,datasets:[
+  {label:'回撤%',data:ddVals,borderColor:'#f87171',
+   backgroundColor:'rgba(248,113,113,0.08)',borderWidth:2,pointRadius:0,fill:true,tension:0.2}
+]},options:baseOpts()});
+
+new Chart(document.getElementById('mnthC'),{
+  type:'bar',
+  data:{labels:mnthL,datasets:[
+    {label:'月盈亏(¥)',data:mnthP,backgroundColor:mnthP.map(v=>v>0?'rgba(52,211,153,0.7)':'rgba(248,113,113,0.7)'),
+     yAxisID:'y',order:1},
+    {label:'胜率(%)',data:mnthW,type:'line',borderColor:'#fbbf24',borderWidth:2,
+     pointRadius:5,yAxisID:'y1',order:0}
+  ]},
+  options:{
+    responsive:true,
+    plugins:{legend:{labels:{color:tc,font:{size:11}}}},
+    scales:{
+      x:{ticks:{color:tc},grid:{color:gc}},
+      y:{ticks:{color:tc},grid:{color:gc},title:{display:true,text:'¥',color:tc}},
+      y1:{ticks:{color:'#fbbf24'},grid:{display:false},
+           position:'right',title:{display:true,text:'胜率%',color:'#fbbf24'}}
+    }
+  }
+});
+
+new Chart(document.getElementById('revC'),{type:'bar',data:{labels:revL,datasets:[
+  {label:'反手平仓次数',data:revV,backgroundColor:'rgba(251,146,60,0.7)',borderColor:'#fb923c',borderWidth:1}
+]},options:baseOpts({plugins:{legend:{display:false}}})});
+
+new Chart(document.getElementById('hdgC'),{type:'bar',data:{labels:hdgL,datasets:[
+  {label:'对冲触发次数',data:hdgV,backgroundColor:'rgba(52,211,153,0.7)',borderColor:'#34d399',borderWidth:1}
+]},options:baseOpts({plugins:{legend:{display:false}}})});
+</script>
+</body></html>
