@@ -1,0 +1,15 @@
+{
+  "initial_capital": 200000.0,
+  "final_capital": 198570.47,
+  "total_return": -0.7148,
+  "annual_return": -3.2664,
+  "sharpe": -4.9245,
+  "max_drawdown": -0.7537,
+  "win_rate": 22.22,
+  "profit_loss_ratio": 0.6049,
+  "n_trades": 94,
+  "n_open": 28,
+  "n_reverse": 11,
+  "n_hedge": 8,
+  "n_stoploss": 0
+}
