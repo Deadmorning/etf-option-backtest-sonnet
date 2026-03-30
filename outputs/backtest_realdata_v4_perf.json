@@ -1,0 +1,17 @@
+{
+  "initial_capital": 200000.0,
+  "final_capital": 200375.72,
+  "total_return": 0.19,
+  "annual_return": 6.93,
+  "sharpe": 6.2973,
+  "max_drawdown": -0.04,
+  "win_rate": 57.1,
+  "profit_loss_ratio": 1.503,
+  "n_trades": 24,
+  "n_open": 5,
+  "n_reverse": 2,
+  "n_hedge": 5,
+  "n_stop_loss": 0,
+  "n_days": 7,
+  "period": "2026-03-19 ~ 2026-03-30"
+}
